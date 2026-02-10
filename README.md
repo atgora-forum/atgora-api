@@ -1,3 +1,9 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/atgora-forum/.github/main/assets/logo.svg">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/atgora-forum/.github/main/assets/logo.svg">
+  <img align="right" alt="ATgora Logo" src="https://raw.githubusercontent.com/atgora-forum/.github/main/assets/logo.svg" width="96">
+</picture>
+
 # atgora-api
 
 **AppView backend for ATgora forums**
