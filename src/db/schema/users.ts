@@ -16,4 +16,5 @@ export const users = pgTable("users", {
   lastActiveAt: timestamp("last_active_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
+  ageDeclaredAt: timestamp("age_declared_at", { withTimezone: true }),
 });
