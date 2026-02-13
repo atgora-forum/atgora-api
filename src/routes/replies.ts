@@ -563,15 +563,16 @@ export function replyRoutes(): FastifyPluginCallback {
           await pdsClient.deleteRecord(user.did, COLLECTION, rkey);
         }
 
-        // Delete reply and update topic replyCount
-        await db.delete(replies).where(eq(replies.uri, decodedUri));
-
-        await db
-          .update(topics)
-          .set({
-            replyCount: sql`GREATEST(${topics.replyCount} - 1, 0)`,
-          })
-          .where(eq(topics.uri, replyRow.rootUri));
+        // Delete reply and update topic replyCount in a transaction
+        await db.transaction(async (tx) => {
+          await tx.delete(replies).where(eq(replies.uri, decodedUri));
+          await tx
+            .update(topics)
+            .set({
+              replyCount: sql`GREATEST(${topics.replyCount} - 1, 0)`,
+            })
+            .where(eq(topics.uri, replyRow.rootUri));
+        });
 
         return await reply.status(204).send();
       } catch (err: unknown) {
