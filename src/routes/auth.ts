@@ -17,8 +17,11 @@ const callbackQuerySchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// Cookie options helper
+// Constants
 // ---------------------------------------------------------------------------
+
+const COOKIE_NAME = "atgora_refresh";
+const COOKIE_PATH = "/api/auth";
 
 function isDevMode(clientId: string): boolean {
   return clientId.startsWith("http://localhost");
@@ -45,15 +48,13 @@ export function authRoutes(
     const dev = isDevMode(env.OAUTH_CLIENT_ID);
     const sessionTtl = env.OAUTH_SESSION_TTL;
 
-    // Cookie name constant
-    const COOKIE_NAME = "atgora_refresh";
-    const COOKIE_PATH = "/api/auth";
-
     // -------------------------------------------------------------------
     // GET /api/auth/login?handle={handle}
     // -------------------------------------------------------------------
 
-    app.get("/api/auth/login", async (request, reply) => {
+    app.get("/api/auth/login", {
+      config: { rateLimit: { max: env.RATE_LIMIT_AUTH, timeWindow: "1 minute" } },
+    }, async (request, reply) => {
       const parsed = loginQuerySchema.safeParse(request.query);
       if (!parsed.success) {
         return reply.status(400).send({ error: "Invalid handle" });
@@ -76,7 +77,9 @@ export function authRoutes(
     // GET /api/auth/callback?iss={iss}&code={code}&state={state}
     // -------------------------------------------------------------------
 
-    app.get("/api/auth/callback", async (request, reply) => {
+    app.get("/api/auth/callback", {
+      config: { rateLimit: { max: Math.ceil(env.RATE_LIMIT_AUTH / 2), timeWindow: "1 minute" } },
+    }, async (request, reply) => {
       const parsed = callbackQuerySchema.safeParse(request.query);
       if (!parsed.success) {
         return reply.status(400).send({ error: "Invalid callback parameters" });
@@ -92,12 +95,10 @@ export function authRoutes(
         // Extract DID from the OAuth session
         const did = result.session.did;
 
-        // Create our application session
-        // The handle is resolved from the DID; for now we use the DID as a
-        // placeholder if handle resolution is not available from the OAuth session.
-        // In practice, the handle was used to initiate login and can be resolved
-        // from the AT Protocol identity layer.
-        const handle = did; // Will be resolved properly via identity resolver in production
+        // TODO(M3): Resolve handle from DID via AT Protocol identity layer.
+        // Currently uses DID as placeholder. Will be resolved when identity
+        // resolver is wired up (user profile caching from AT Protocol identity).
+        const handle = did;
 
         const session = await sessionService.createSession(did, handle);
 
@@ -132,26 +133,31 @@ export function authRoutes(
         return reply.status(401).send({ error: "No refresh token" });
       }
 
-      const session = await sessionService.refreshSession(sid);
-      if (!session) {
-        // Clear the stale cookie
-        void reply.clearCookie(COOKIE_NAME, { path: COOKIE_PATH });
-        return reply.status(401).send({ error: "Session expired" });
+      try {
+        const session = await sessionService.refreshSession(sid);
+        if (!session) {
+          // Clear the stale cookie
+          void reply.clearCookie(COOKIE_NAME, { path: COOKIE_PATH });
+          return await reply.status(401).send({ error: "Session expired" });
+        }
+
+        // Re-set refresh cookie with refreshed maxAge
+        void reply.setCookie(COOKIE_NAME, session.sid, {
+          httpOnly: true,
+          secure: !dev,
+          sameSite: "strict",
+          path: COOKIE_PATH,
+          maxAge: sessionTtl,
+        });
+
+        return await reply.status(200).send({
+          accessToken: session.accessToken,
+          expiresAt: session.accessTokenExpiresAt,
+        });
+      } catch (err: unknown) {
+        app.log.error({ err }, "Session refresh failed");
+        return reply.status(502).send({ error: "Service temporarily unavailable" });
       }
-
-      // Re-set refresh cookie with refreshed maxAge
-      void reply.setCookie(COOKIE_NAME, session.sid, {
-        httpOnly: true,
-        secure: !dev,
-        sameSite: "strict",
-        path: COOKIE_PATH,
-        maxAge: sessionTtl,
-      });
-
-      return reply.status(200).send({
-        accessToken: session.accessToken,
-        expiresAt: session.accessTokenExpiresAt,
-      });
     });
 
     // -------------------------------------------------------------------
@@ -164,7 +170,12 @@ export function authRoutes(
         return reply.status(204).send();
       }
 
-      await sessionService.deleteSession(sid);
+      try {
+        await sessionService.deleteSession(sid);
+      } catch (err: unknown) {
+        app.log.error({ err }, "Session deletion failed");
+        return reply.status(502).send({ error: "Service temporarily unavailable" });
+      }
 
       // Clear the cookie
       void reply.clearCookie(COOKIE_NAME, { path: COOKIE_PATH });
@@ -184,15 +195,20 @@ export function authRoutes(
 
       const token = authHeader.slice("Bearer ".length);
 
-      const session = await sessionService.validateAccessToken(token);
-      if (!session) {
-        return reply.status(401).send({ error: "Invalid or expired token" });
-      }
+      try {
+        const session = await sessionService.validateAccessToken(token);
+        if (!session) {
+          return await reply.status(401).send({ error: "Invalid or expired token" });
+        }
 
-      return reply.status(200).send({
-        did: session.did,
-        handle: session.handle,
-      });
+        return await reply.status(200).send({
+          did: session.did,
+          handle: session.handle,
+        });
+      } catch (err: unknown) {
+        app.log.error({ err }, "Token validation failed");
+        return reply.status(502).send({ error: "Service temporarily unavailable" });
+      }
     });
 
     done();

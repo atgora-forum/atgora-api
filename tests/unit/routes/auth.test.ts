@@ -219,6 +219,9 @@ describe("auth routes", () => {
       expect(body.did).toBe(TEST_DID);
       expect(body.handle).toBe(TEST_HANDLE);
 
+      // Verify session created with DID as handle placeholder (TODO(M3): resolve handle)
+      expect(createSessionFn).toHaveBeenCalledWith(TEST_DID, TEST_DID);
+
       // Verify cookie was set
       const cookies = response.cookies;
       const refreshCookie = cookies.find(
@@ -449,5 +452,114 @@ describe("auth routes", () => {
       const body = response.json<{ error: string }>();
       expect(body.error).toBe("Invalid or expired token");
     });
+
+    it("returns 502 when session service throws", async () => {
+      validateAccessTokenFn.mockRejectedValueOnce(new Error("Valkey down"));
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/auth/me",
+        headers: {
+          authorization: `Bearer ${TEST_ACCESS_TOKEN}`,
+        },
+      });
+
+      expect(response.statusCode).toBe(502);
+      const body = response.json<{ error: string }>();
+      expect(body.error).toBe("Service temporarily unavailable");
+    });
+  });
+
+  // =========================================================================
+  // Service error handling
+  // =========================================================================
+
+  describe("service error handling", () => {
+    it("returns 502 when refresh service throws", async () => {
+      refreshSessionFn.mockRejectedValueOnce(new Error("Valkey down"));
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/auth/refresh",
+        cookies: { atgora_refresh: TEST_SID },
+      });
+
+      expect(response.statusCode).toBe(502);
+      const body = response.json<{ error: string }>();
+      expect(body.error).toBe("Service temporarily unavailable");
+    });
+
+    it("returns 502 when delete service throws", async () => {
+      deleteSessionFn.mockRejectedValueOnce(new Error("Valkey down"));
+
+      const response = await app.inject({
+        method: "DELETE",
+        url: "/api/auth/session",
+        cookies: { atgora_refresh: TEST_SID },
+      });
+
+      expect(response.statusCode).toBe(502);
+      const body = response.json<{ error: string }>();
+      expect(body.error).toBe("Service temporarily unavailable");
+    });
+  });
+});
+
+// ===========================================================================
+// Production-mode cookie security
+// ===========================================================================
+
+describe("auth routes (production mode)", () => {
+  let prodApp: FastifyInstance;
+
+  const prodEnv = {
+    OAUTH_CLIENT_ID: "https://forum.atgora.forum/oauth-client-metadata.json",
+    OAUTH_SESSION_TTL: 604800,
+    OAUTH_ACCESS_TOKEN_TTL: 900,
+    RATE_LIMIT_AUTH: 10,
+  } as Env;
+
+  beforeAll(async () => {
+    prodApp = Fastify({ logger: false });
+    await prodApp.register(cookie, { secret: "a".repeat(32) });
+    prodApp.decorate("env", prodEnv);
+    prodApp.decorate("sessionService", mockSessionService);
+    await prodApp.register(
+      authRoutes(mockOAuthClient as Parameters<typeof authRoutes>[0]),
+    );
+    await prodApp.ready();
+  });
+
+  afterAll(async () => {
+    await prodApp.close();
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("sets secure cookie in production mode", async () => {
+    const mockSession = makeMockSessionWithToken();
+    const mockOAuthSession = { did: TEST_DID };
+
+    callbackFn.mockResolvedValueOnce({
+      session: mockOAuthSession,
+      state: "some-state",
+    });
+    createSessionFn.mockResolvedValueOnce(mockSession);
+
+    const response = await prodApp.inject({
+      method: "GET",
+      url: "/api/auth/callback?iss=https://pds.example.com&code=test-code&state=test-state",
+    });
+
+    expect(response.statusCode).toBe(200);
+
+    const cookies = response.cookies;
+    const refreshCookie = cookies.find(
+      (c: { name: string }) => c.name === "atgora_refresh",
+    );
+    expect(refreshCookie).toBeDefined();
+    expect(refreshCookie?.secure).toBe(true);
   });
 });
