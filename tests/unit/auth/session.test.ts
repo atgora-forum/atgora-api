@@ -72,6 +72,28 @@ const defaultConfig: SessionConfig = {
 const testDid = "did:plc:test-user-123";
 const testHandle = "alice.bsky.social";
 
+/**
+ * Build a mock persisted session (as stored in Valkey).
+ * Uses accessTokenHash (never raw accessToken).
+ */
+function buildPersistedSession(overrides: {
+  sid?: string;
+  did?: string;
+  handle?: string;
+  accessTokenHash?: string;
+  accessTokenExpiresAt?: number;
+  createdAt?: number;
+} = {}) {
+  return {
+    sid: overrides.sid ?? "a".repeat(64),
+    did: overrides.did ?? testDid,
+    handle: overrides.handle ?? testHandle,
+    accessTokenHash: overrides.accessTokenHash ?? sha256("b".repeat(64)),
+    accessTokenExpiresAt: overrides.accessTokenExpiresAt ?? Date.now() + 900_000,
+    createdAt: overrides.createdAt ?? Date.now(),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -136,12 +158,23 @@ describe("SessionService", () => {
       expect(session1.accessToken).not.toBe(session2.accessToken);
     });
 
-    it("stores session data in Valkey with correct TTL", async () => {
+    it("stores session data with accessTokenHash (not raw token) in Valkey", async () => {
       const session = await service.createSession(testDid, testHandle);
+      const tokenHash = sha256(session.accessToken);
+
+      // The persisted data should have accessTokenHash, NOT accessToken
+      const persisted = {
+        sid: session.sid,
+        did: session.did,
+        handle: session.handle,
+        accessTokenHash: tokenHash,
+        accessTokenExpiresAt: session.accessTokenExpiresAt,
+        createdAt: session.createdAt,
+      };
 
       expect(setFn).toHaveBeenCalledWith(
         `atgora:session:data:${session.sid}`,
-        JSON.stringify(session),
+        JSON.stringify(persisted),
         "EX",
         604800,
       );
@@ -196,7 +229,7 @@ describe("SessionService", () => {
       expect(session.createdAt).toBeLessThanOrEqual(after);
     });
 
-    it("returns a complete Session object", async () => {
+    it("returns SessionWithToken including both accessToken and accessTokenHash", async () => {
       const session = await service.createSession(testDid, testHandle);
 
       expect(session).toEqual(
@@ -205,10 +238,14 @@ describe("SessionService", () => {
           did: testDid,
           handle: testHandle,
           accessToken: expect.stringMatching(/^[a-f0-9]{64}$/) as string,
+          accessTokenHash: expect.stringMatching(/^[a-f0-9]{64}$/) as string,
           accessTokenExpiresAt: expect.any(Number) as number,
           createdAt: expect.any(Number) as number,
         }),
       );
+
+      // accessTokenHash should be the SHA-256 of accessToken
+      expect(session.accessTokenHash).toBe(sha256(session.accessToken));
     });
 
     it("logs debug on success without raw tokens", async () => {
@@ -245,27 +282,20 @@ describe("SessionService", () => {
   // -------------------------------------------------------------------------
   describe("validateAccessToken", () => {
     it("returns session when access token is valid", async () => {
-      // Create a session to get realistic data
-      const mockSession = {
-        sid: "a".repeat(64),
-        did: testDid,
-        handle: testHandle,
-        accessToken: "b".repeat(64),
-        accessTokenExpiresAt: Date.now() + 900_000,
-        createdAt: Date.now(),
-      };
-      const tokenHash = sha256(mockSession.accessToken);
+      const rawToken = "b".repeat(64);
+      const tokenHash = sha256(rawToken);
+      const persisted = buildPersistedSession({ accessTokenHash: tokenHash });
 
-      // First get call returns the sid from the access token hash lookup
-      getFn.mockResolvedValueOnce(mockSession.sid);
-      // Second get call returns the session data
-      getFn.mockResolvedValueOnce(JSON.stringify(mockSession));
+      // First get: access token hash → sid
+      getFn.mockResolvedValueOnce(persisted.sid);
+      // Second get: session data
+      getFn.mockResolvedValueOnce(JSON.stringify(persisted));
 
-      const result = await service.validateAccessToken(mockSession.accessToken);
+      const result = await service.validateAccessToken(rawToken);
 
-      expect(result).toEqual(mockSession);
+      expect(result).toEqual(persisted);
       expect(getFn).toHaveBeenCalledWith(`atgora:session:access:${tokenHash}`);
-      expect(getFn).toHaveBeenCalledWith(`atgora:session:data:${mockSession.sid}`);
+      expect(getFn).toHaveBeenCalledWith(`atgora:session:data:${persisted.sid}`);
     });
 
     it("returns undefined when access token not found", async () => {
@@ -315,65 +345,51 @@ describe("SessionService", () => {
   // -------------------------------------------------------------------------
   describe("refreshSession", () => {
     it("returns updated session with new access token", async () => {
-      const existingSession = {
-        sid: "a".repeat(64),
-        did: testDid,
-        handle: testHandle,
-        accessToken: "old-token-" + "x".repeat(54),
-        accessTokenExpiresAt: Date.now() - 1000, // expired
+      const oldTokenHash = sha256("old-token-" + "x".repeat(54));
+      const persisted = buildPersistedSession({
+        accessTokenHash: oldTokenHash,
+        accessTokenExpiresAt: Date.now() - 1000,
         createdAt: Date.now() - 600_000,
-      };
+      });
 
-      getFn.mockResolvedValueOnce(JSON.stringify(existingSession));
+      getFn.mockResolvedValueOnce(JSON.stringify(persisted));
 
-      const result = await service.refreshSession(existingSession.sid);
+      const result = await service.refreshSession(persisted.sid);
 
       if (result === undefined) {
         expect.fail("Expected session to be defined");
       }
-      expect(result.sid).toBe(existingSession.sid);
+      expect(result.sid).toBe(persisted.sid);
       expect(result.did).toBe(testDid);
       expect(result.handle).toBe(testHandle);
-      // New access token should be different
-      expect(result.accessToken).not.toBe(existingSession.accessToken);
+      // New access token should be a fresh 64-char hex string
       expect(result.accessToken).toMatch(/^[a-f0-9]{64}$/);
+      // New accessTokenHash should match the new access token
+      expect(result.accessTokenHash).toBe(sha256(result.accessToken));
+      expect(result.accessTokenHash).not.toBe(oldTokenHash);
       // New expiry should be in the future
       expect(result.accessTokenExpiresAt).toBeGreaterThan(Date.now());
       // createdAt should remain the same
-      expect(result.createdAt).toBe(existingSession.createdAt);
+      expect(result.createdAt).toBe(persisted.createdAt);
     });
 
     it("deletes old access token lookup", async () => {
-      const existingSession = {
-        sid: "a".repeat(64),
-        did: testDid,
-        handle: testHandle,
-        accessToken: "old-token-" + "x".repeat(54),
-        accessTokenExpiresAt: Date.now() - 1000,
-        createdAt: Date.now() - 600_000,
-      };
-      const oldTokenHash = sha256(existingSession.accessToken);
+      const oldTokenHash = sha256("old-token-" + "x".repeat(54));
+      const persisted = buildPersistedSession({ accessTokenHash: oldTokenHash });
 
-      getFn.mockResolvedValueOnce(JSON.stringify(existingSession));
+      getFn.mockResolvedValueOnce(JSON.stringify(persisted));
 
-      await service.refreshSession(existingSession.sid);
+      await service.refreshSession(persisted.sid);
 
       expect(delFn).toHaveBeenCalledWith(`atgora:session:access:${oldTokenHash}`);
     });
 
     it("creates new access token lookup", async () => {
-      const existingSession = {
-        sid: "a".repeat(64),
-        did: testDid,
-        handle: testHandle,
-        accessToken: "old-token-" + "x".repeat(54),
-        accessTokenExpiresAt: Date.now() - 1000,
-        createdAt: Date.now() - 600_000,
-      };
+      const persisted = buildPersistedSession();
 
-      getFn.mockResolvedValueOnce(JSON.stringify(existingSession));
+      getFn.mockResolvedValueOnce(JSON.stringify(persisted));
 
-      const result = await service.refreshSession(existingSession.sid);
+      const result = await service.refreshSession(persisted.sid);
 
       if (result === undefined) {
         expect.fail("Expected session to be defined");
@@ -381,33 +397,36 @@ describe("SessionService", () => {
       const newTokenHash = sha256(result.accessToken);
       expect(setFn).toHaveBeenCalledWith(
         `atgora:session:access:${newTokenHash}`,
-        existingSession.sid,
+        persisted.sid,
         "EX",
         900,
       );
     });
 
-    it("updates session data with new access token and expiry", async () => {
-      const existingSession = {
-        sid: "a".repeat(64),
-        did: testDid,
-        handle: testHandle,
-        accessToken: "old-token-" + "x".repeat(54),
-        accessTokenExpiresAt: Date.now() - 1000,
-        createdAt: Date.now() - 600_000,
-      };
+    it("updates session data with new accessTokenHash (not raw token)", async () => {
+      const persisted = buildPersistedSession();
 
-      getFn.mockResolvedValueOnce(JSON.stringify(existingSession));
+      getFn.mockResolvedValueOnce(JSON.stringify(persisted));
 
-      const result = await service.refreshSession(existingSession.sid);
+      const result = await service.refreshSession(persisted.sid);
 
       if (result === undefined) {
         expect.fail("Expected session to be defined");
       }
-      // Session data should be stored with the updated session
+
+      // The persisted form should have accessTokenHash but NOT accessToken
+      const expectedPersisted = {
+        sid: result.sid,
+        did: result.did,
+        handle: result.handle,
+        accessTokenHash: result.accessTokenHash,
+        accessTokenExpiresAt: result.accessTokenExpiresAt,
+        createdAt: result.createdAt,
+      };
+
       expect(setFn).toHaveBeenCalledWith(
-        `atgora:session:data:${existingSession.sid}`,
-        JSON.stringify(result),
+        `atgora:session:data:${persisted.sid}`,
+        JSON.stringify(expectedPersisted),
         "EX",
         604800,
       );
@@ -422,22 +441,15 @@ describe("SessionService", () => {
     });
 
     it("logs debug on success", async () => {
-      const existingSession = {
-        sid: "a".repeat(64),
-        did: testDid,
-        handle: testHandle,
-        accessToken: "old-token-" + "x".repeat(54),
-        accessTokenExpiresAt: Date.now() - 1000,
-        createdAt: Date.now() - 600_000,
-      };
+      const persisted = buildPersistedSession();
 
-      getFn.mockResolvedValueOnce(JSON.stringify(existingSession));
+      getFn.mockResolvedValueOnce(JSON.stringify(persisted));
 
-      await service.refreshSession(existingSession.sid);
+      await service.refreshSession(persisted.sid);
 
       expect(debugFn).toHaveBeenCalledWith(
         expect.objectContaining({
-          sid: existingSession.sid.slice(0, 8),
+          sid: persisted.sid.slice(0, 8),
         }),
         "Session refreshed",
       );
@@ -459,60 +471,36 @@ describe("SessionService", () => {
   // -------------------------------------------------------------------------
   describe("deleteSession", () => {
     it("deletes session data", async () => {
-      const sid = "a".repeat(64);
-      const existingSession = {
-        sid,
-        did: testDid,
-        handle: testHandle,
-        accessToken: "b".repeat(64),
-        accessTokenExpiresAt: Date.now() + 900_000,
-        createdAt: Date.now(),
-      };
+      const persisted = buildPersistedSession();
 
-      getFn.mockResolvedValueOnce(JSON.stringify(existingSession));
+      getFn.mockResolvedValueOnce(JSON.stringify(persisted));
 
-      await service.deleteSession(sid);
+      await service.deleteSession(persisted.sid);
 
-      expect(delFn).toHaveBeenCalledWith(`atgora:session:data:${sid}`);
+      expect(delFn).toHaveBeenCalledWith(`atgora:session:data:${persisted.sid}`);
     });
 
-    it("deletes access token lookup", async () => {
-      const sid = "a".repeat(64);
-      const existingSession = {
-        sid,
-        did: testDid,
-        handle: testHandle,
-        accessToken: "b".repeat(64),
-        accessTokenExpiresAt: Date.now() + 900_000,
-        createdAt: Date.now(),
-      };
-      const tokenHash = sha256(existingSession.accessToken);
+    it("deletes access token lookup using stored hash", async () => {
+      const tokenHash = sha256("b".repeat(64));
+      const persisted = buildPersistedSession({ accessTokenHash: tokenHash });
 
-      getFn.mockResolvedValueOnce(JSON.stringify(existingSession));
+      getFn.mockResolvedValueOnce(JSON.stringify(persisted));
 
-      await service.deleteSession(sid);
+      await service.deleteSession(persisted.sid);
 
       expect(delFn).toHaveBeenCalledWith(`atgora:session:access:${tokenHash}`);
     });
 
     it("removes session ID from DID index set", async () => {
-      const sid = "a".repeat(64);
-      const existingSession = {
-        sid,
-        did: testDid,
-        handle: testHandle,
-        accessToken: "b".repeat(64),
-        accessTokenExpiresAt: Date.now() + 900_000,
-        createdAt: Date.now(),
-      };
+      const persisted = buildPersistedSession();
 
-      getFn.mockResolvedValueOnce(JSON.stringify(existingSession));
+      getFn.mockResolvedValueOnce(JSON.stringify(persisted));
 
-      await service.deleteSession(sid);
+      await service.deleteSession(persisted.sid);
 
       expect(sremFn).toHaveBeenCalledWith(
         `atgora:session:did:${testDid}`,
-        sid,
+        persisted.sid,
       );
     });
 
@@ -523,22 +511,14 @@ describe("SessionService", () => {
     });
 
     it("logs debug on success", async () => {
-      const sid = "a".repeat(64);
-      const existingSession = {
-        sid,
-        did: testDid,
-        handle: testHandle,
-        accessToken: "b".repeat(64),
-        accessTokenExpiresAt: Date.now() + 900_000,
-        createdAt: Date.now(),
-      };
+      const persisted = buildPersistedSession();
 
-      getFn.mockResolvedValueOnce(JSON.stringify(existingSession));
+      getFn.mockResolvedValueOnce(JSON.stringify(persisted));
 
-      await service.deleteSession(sid);
+      await service.deleteSession(persisted.sid);
 
       expect(debugFn).toHaveBeenCalledWith(
-        expect.objectContaining({ sid: sid.slice(0, 8) }),
+        expect.objectContaining({ sid: persisted.sid.slice(0, 8) }),
         "Session deleted",
       );
     });
@@ -560,22 +540,14 @@ describe("SessionService", () => {
       const sid1 = "a".repeat(64);
       const sid2 = "b".repeat(64);
 
-      const session1 = {
+      const session1 = buildPersistedSession({
         sid: sid1,
-        did: testDid,
-        handle: testHandle,
-        accessToken: "c".repeat(64),
-        accessTokenExpiresAt: Date.now() + 900_000,
-        createdAt: Date.now(),
-      };
-      const session2 = {
+        accessTokenHash: sha256("c".repeat(64)),
+      });
+      const session2 = buildPersistedSession({
         sid: sid2,
-        did: testDid,
-        handle: testHandle,
-        accessToken: "d".repeat(64),
-        accessTokenExpiresAt: Date.now() + 900_000,
-        createdAt: Date.now(),
-      };
+        accessTokenHash: sha256("d".repeat(64)),
+      });
 
       // smembers returns the set of session IDs
       smembersFn.mockResolvedValueOnce([sid1, sid2]);
@@ -595,28 +567,15 @@ describe("SessionService", () => {
       const sid3 = "c".repeat(64);
 
       smembersFn.mockResolvedValueOnce([sid1, sid2, sid3]);
-      // Each deleteSession will call getFn for the session data
-      getFn.mockResolvedValueOnce(
-        JSON.stringify({
-          sid: sid1, did: testDid, handle: testHandle,
-          accessToken: "x".repeat(64),
-          accessTokenExpiresAt: Date.now() + 900_000, createdAt: Date.now(),
-        }),
-      );
-      getFn.mockResolvedValueOnce(
-        JSON.stringify({
-          sid: sid2, did: testDid, handle: testHandle,
-          accessToken: "y".repeat(64),
-          accessTokenExpiresAt: Date.now() + 900_000, createdAt: Date.now(),
-        }),
-      );
-      getFn.mockResolvedValueOnce(
-        JSON.stringify({
-          sid: sid3, did: testDid, handle: testHandle,
-          accessToken: "z".repeat(64),
-          accessTokenExpiresAt: Date.now() + 900_000, createdAt: Date.now(),
-        }),
-      );
+      getFn.mockResolvedValueOnce(JSON.stringify(buildPersistedSession({
+        sid: sid1, accessTokenHash: sha256("x".repeat(64)),
+      })));
+      getFn.mockResolvedValueOnce(JSON.stringify(buildPersistedSession({
+        sid: sid2, accessTokenHash: sha256("y".repeat(64)),
+      })));
+      getFn.mockResolvedValueOnce(JSON.stringify(buildPersistedSession({
+        sid: sid3, accessTokenHash: sha256("z".repeat(64)),
+      })));
 
       const count = await service.deleteAllSessionsForDid(testDid);
 
@@ -625,13 +584,7 @@ describe("SessionService", () => {
 
     it("removes the DID index set", async () => {
       smembersFn.mockResolvedValueOnce(["a".repeat(64)]);
-      getFn.mockResolvedValueOnce(
-        JSON.stringify({
-          sid: "a".repeat(64), did: testDid, handle: testHandle,
-          accessToken: "b".repeat(64),
-          accessTokenExpiresAt: Date.now() + 900_000, createdAt: Date.now(),
-        }),
-      );
+      getFn.mockResolvedValueOnce(JSON.stringify(buildPersistedSession()));
 
       await service.deleteAllSessionsForDid(testDid);
 
@@ -648,13 +601,7 @@ describe("SessionService", () => {
 
     it("logs debug with count on success", async () => {
       smembersFn.mockResolvedValueOnce(["a".repeat(64)]);
-      getFn.mockResolvedValueOnce(
-        JSON.stringify({
-          sid: "a".repeat(64), did: testDid, handle: testHandle,
-          accessToken: "b".repeat(64),
-          accessTokenExpiresAt: Date.now() + 900_000, createdAt: Date.now(),
-        }),
-      );
+      getFn.mockResolvedValueOnce(JSON.stringify(buildPersistedSession()));
 
       await service.deleteAllSessionsForDid(testDid);
 
