@@ -270,6 +270,25 @@ describe("setup routes", () => {
       );
     });
 
+    it("returns 400 for communityName exceeding max length", async () => {
+      validateAccessTokenFn.mockResolvedValueOnce(makeMockSession());
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/setup/initialize",
+        headers: {
+          authorization: `Bearer ${TEST_ACCESS_TOKEN}`,
+          "content-type": "application/json",
+        },
+        payload: { communityName: "x".repeat(256) },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json<{ error: string }>().error).toBe(
+        "Invalid request body",
+      );
+    });
+
     it("returns 400 for invalid communityName (whitespace only)", async () => {
       validateAccessTokenFn.mockResolvedValueOnce(makeMockSession());
 

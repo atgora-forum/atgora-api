@@ -6,7 +6,7 @@ import type { FastifyPluginCallback } from "fastify";
 // ---------------------------------------------------------------------------
 
 const initializeBodySchema = z.object({
-  communityName: z.string().trim().min(1).optional(),
+  communityName: z.string().trim().min(1).max(255).optional(),
 });
 
 // ---------------------------------------------------------------------------

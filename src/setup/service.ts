@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { communitySettings } from "../db/schema/community-settings.js";
 import type { Database } from "../db/index.js";
 import type { Logger } from "../lib/logger.js";
@@ -74,6 +74,10 @@ export function createSetupService(db: Database, logger: Logger): SetupService {
   /**
    * Initialize the community with the first admin user.
    *
+   * Uses an atomic upsert to prevent race conditions: INSERT new row, or
+   * UPDATE existing if not yet initialized. The WHERE clause ensures an
+   * already-initialized row is never overwritten.
+   *
    * @param did - DID of the authenticated user who becomes admin
    * @param communityName - Optional community name override
    * @returns InitializeResult with the new state or conflict indicator
@@ -83,64 +87,43 @@ export function createSetupService(db: Database, logger: Logger): SetupService {
     communityName?: string,
   ): Promise<InitializeResult> {
     try {
-      // Check current state
+      // Atomic upsert: INSERT new row, or UPDATE existing if not yet initialized.
+      // The WHERE clause ensures an already-initialized row is never overwritten.
       const rows = await db
-        .select({
-          initialized: communitySettings.initialized,
-          communityName: communitySettings.communityName,
-        })
-        .from(communitySettings)
-        .where(eq(communitySettings.id, "default"));
-
-      const existing = rows[0];
-
-      // Already initialized: conflict
-      if (existing?.initialized) {
-        logger.warn({ did }, "Setup initialize attempted on already-initialized community");
-        return { alreadyInitialized: true };
-      }
-
-      // Determine the final community name
-      const finalName = communityName ?? existing?.communityName ?? DEFAULT_COMMUNITY_NAME;
-
-      // Row exists but not initialized: update it
-      if (existing) {
-        await db
-          .update(communitySettings)
-          .set({
-            initialized: true,
-            adminDid: did,
-            communityName: finalName,
-            updatedAt: new Date(),
-          })
-          .where(eq(communitySettings.id, "default"));
-
-        logger.info(
-          { did, communityName: finalName },
-          "Community initialized (updated existing row)",
-        );
-
-        return {
-          initialized: true,
-          adminDid: did,
-          communityName: finalName,
-        };
-      }
-
-      // No row exists: insert a new one
-      await db
         .insert(communitySettings)
         .values({
           id: "default",
           initialized: true,
           adminDid: did,
-          communityName: finalName,
+          communityName: communityName ?? DEFAULT_COMMUNITY_NAME,
+        })
+        .onConflictDoUpdate({
+          target: communitySettings.id,
+          set: {
+            initialized: true,
+            adminDid: did,
+            communityName: communityName
+              ? communityName
+              : sql`${communitySettings.communityName}`,
+            updatedAt: new Date(),
+          },
+          where: eq(communitySettings.initialized, false),
+        })
+        .returning({
+          communityName: communitySettings.communityName,
         });
 
-      logger.info(
-        { did, communityName: finalName },
-        "Community initialized (inserted new row)",
-      );
+      const row = rows[0];
+      if (!row) {
+        logger.warn(
+          { did },
+          "Setup initialize attempted on already-initialized community",
+        );
+        return { alreadyInitialized: true };
+      }
+
+      const finalName = row.communityName;
+      logger.info({ did, communityName: finalName }, "Community initialized");
 
       return {
         initialized: true,
