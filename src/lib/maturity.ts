@@ -2,8 +2,10 @@
 // Maturity rating helpers (shared between categories and admin-settings)
 // ---------------------------------------------------------------------------
 
-/** Valid maturity rating values. */
-export type MaturityRating = "safe" | "mature" | "adult";
+import type { MaturityRating as ZodMaturityRating } from "../validation/categories.js";
+
+/** Valid maturity rating values. Derived from Zod schema as single source of truth. */
+export type MaturityRating = ZodMaturityRating;
 
 /** Numeric order of maturity ratings for comparison. */
 export const MATURITY_ORDER: Record<MaturityRating, number> = {

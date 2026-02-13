@@ -2,7 +2,6 @@ import { eq } from "drizzle-orm";
 import type { FastifyPluginCallback } from "fastify";
 import { notFound, badRequest } from "../lib/api-errors.js";
 import { isMaturityLowerThan } from "../lib/maturity.js";
-import type { MaturityRating } from "../lib/maturity.js";
 import { updateSettingsSchema } from "../validation/admin-settings.js";
 import { communitySettings } from "../db/schema/community-settings.js";
 import { categories } from "../db/schema/categories.js";
@@ -172,9 +171,8 @@ export function adminSettingsRoutes(): FastifyPluginCallback {
         updates.maturityRating !== undefined &&
         updates.maturityRating !== current.maturityRating
       ) {
-        // Safe: maturityRating validated by updateSettingsSchema (Zod) and DB enum constraint
-        const newRating = updates.maturityRating as MaturityRating;
-        const currentRating = current.maturityRating as MaturityRating;
+        const newRating = updates.maturityRating;
+        const currentRating = current.maturityRating;
 
         if (isMaturityLowerThan(currentRating, newRating)) {
           // Raising maturity: find categories below the new threshold
@@ -186,8 +184,7 @@ export function adminSettingsRoutes(): FastifyPluginCallback {
 
           // Filter in application code since maturity comparison is enum-based
           const belowThreshold = allCategories.filter((cat) =>
-            // Safe: maturityRating constrained by DB enum
-            isMaturityLowerThan(cat.maturityRating as MaturityRating, newRating),
+            isMaturityLowerThan(cat.maturityRating, newRating),
           );
 
           if (belowThreshold.length > 0) {

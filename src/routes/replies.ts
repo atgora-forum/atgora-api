@@ -4,7 +4,6 @@ import { createPdsClient } from "../lib/pds-client.js";
 import { notFound, forbidden, badRequest } from "../lib/api-errors.js";
 import { resolveMaxMaturity, maturityAllows } from "../lib/content-filter.js";
 import type { MaturityUser } from "../lib/content-filter.js";
-import type { MaturityRating } from "../lib/maturity.js";
 import { createReplySchema, updateReplySchema, replyQuerySchema } from "../validation/replies.js";
 import { replies } from "../db/schema/replies.js";
 import { topics } from "../db/schema/topics.js";
@@ -366,7 +365,7 @@ export function replyRoutes(): FastifyPluginCallback {
       if (catRows.length === 0) {
         app.log.warn({ category: topic.category, communityDid }, "Category not found for maturity check, defaulting to safe");
       }
-      const categoryRating = (catRows[0]?.maturityRating ?? "safe") as MaturityRating;
+      const categoryRating = catRows[0]?.maturityRating ?? "safe";
 
       let userProfile: MaturityUser | undefined;
       if (request.user) {

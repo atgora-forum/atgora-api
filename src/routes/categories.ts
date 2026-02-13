@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { eq, and, count } from "drizzle-orm";
 import type { FastifyPluginCallback } from "fastify";
 import { notFound, badRequest, conflict } from "../lib/api-errors.js";
@@ -124,7 +125,7 @@ function wouldCreateCycle(
  * Generate a random ID for a new category.
  */
 function generateId(): string {
-  return `cat-${String(Date.now())}-${Math.random().toString(36).slice(2, 8)}`;
+  return `cat-${randomUUID()}`;
 }
 
 // ---------------------------------------------------------------------------
