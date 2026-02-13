@@ -13,6 +13,12 @@ export interface RequestUser {
   sid: string;
 }
 
+/** Auth middleware hooks returned by createAuthMiddleware. */
+export interface AuthMiddleware {
+  requireAuth: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  optionalAuth: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+}
+
 // ---------------------------------------------------------------------------
 // Extend Fastify's request type
 // ---------------------------------------------------------------------------
@@ -64,10 +70,7 @@ function extractBearerToken(request: FastifyRequest): string | undefined {
 export function createAuthMiddleware(
   sessionService: SessionService,
   logger: Logger,
-): {
-  requireAuth: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
-  optionalAuth: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
-} {
+): AuthMiddleware {
   /**
    * Require authentication. Returns 401 if no valid token, 502 if service error.
    * On success, sets `request.user` with the authenticated user info.

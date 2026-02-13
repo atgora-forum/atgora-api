@@ -4,7 +4,7 @@ import cors from "@fastify/cors";
 import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
 import * as Sentry from "@sentry/node";
-import type { FastifyError, FastifyRequest, FastifyReply } from "fastify";
+import type { FastifyError } from "fastify";
 import type { NodeOAuthClient } from "@atproto/oauth-client-node";
 import type { Env } from "./config/env.js";
 import { createDb } from "./db/index.js";
@@ -14,18 +14,12 @@ import { createOAuthClient } from "./auth/oauth-client.js";
 import { createSessionService } from "./auth/session.js";
 import type { SessionService } from "./auth/session.js";
 import { createAuthMiddleware } from "./auth/middleware.js";
-import type { RequestUser } from "./auth/middleware.js";
+import type { AuthMiddleware, RequestUser } from "./auth/middleware.js";
 import healthRoutes from "./routes/health.js";
 import { oauthMetadataRoutes } from "./routes/oauth-metadata.js";
 import { authRoutes } from "./routes/auth.js";
 import type { Database } from "./db/index.js";
 import type { Cache } from "./cache/index.js";
-
-// Auth middleware return type
-interface AuthMiddleware {
-  requireAuth: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
-  optionalAuth: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
-}
 
 // Extend Fastify types with decorated properties
 declare module "fastify" {

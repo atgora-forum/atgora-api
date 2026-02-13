@@ -23,12 +23,13 @@ function createMockSessionService(): SessionService {
 }
 
 // Logger mock functions
+const logErrorFn = vi.fn();
 const logWarnFn = vi.fn();
 
 function createMockLogger(): Logger {
   return {
     info: vi.fn(),
-    error: vi.fn(),
+    error: logErrorFn,
     warn: logWarnFn,
     debug: vi.fn(),
     fatal: vi.fn(),
@@ -163,6 +164,7 @@ describe("requireAuth middleware", () => {
 
     expect(response.statusCode).toBe(502);
     expect(response.json<{ error: string }>()).toStrictEqual({ error: "Service temporarily unavailable" });
+    expect(logErrorFn).toHaveBeenCalledOnce();
   });
 });
 
