@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Cache } from "../../../src/cache/index.js";
 import type { Logger } from "../../../src/lib/logger.js";
 import type { Env } from "../../../src/config/env.js";
@@ -270,10 +270,15 @@ describe("requestLock (via createOAuthClient internals)", () => {
   let logMocks: ReturnType<typeof createMockLogger>;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     constructorArgs.length = 0;
     vi.clearAllMocks();
     cacheMocks = createMockCache();
     logMocks = createMockLogger();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("acquires lock, executes function, and releases lock", async () => {
@@ -343,7 +348,9 @@ describe("requestLock (via createOAuthClient internals)", () => {
       .mockResolvedValueOnce(null as unknown as "OK")
       .mockResolvedValueOnce("OK");
 
-    const result = await requestLock("test-lock", () => 42);
+    const promise = requestLock("test-lock", () => 42);
+    await vi.advanceTimersByTimeAsync(1000);
+    const result = await promise;
 
     expect(result).toBe(42);
     expect(cacheMocks.setFn).toHaveBeenCalledTimes(2);
@@ -365,8 +372,10 @@ describe("requestLock (via createOAuthClient internals)", () => {
       .mockResolvedValueOnce(null as unknown as "OK")
       .mockResolvedValueOnce(null as unknown as "OK");
 
-    await expect(
-      requestLock("test-lock", () => "should not run"),
-    ).rejects.toThrow("Could not acquire OAuth lock: test-lock");
+    const promise = requestLock("test-lock", () => "should not run");
+    // Attach rejection handler before advancing timers to avoid unhandled rejection
+    const expectation = expect(promise).rejects.toThrow("Could not acquire OAuth lock: test-lock");
+    await vi.advanceTimersByTimeAsync(1000);
+    await expectation;
   });
 });

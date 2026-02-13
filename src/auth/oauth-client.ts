@@ -57,6 +57,8 @@ function createRequestLock(cache: Cache, logger: Logger): RuntimeLock {
     try {
       return await fn();
     } finally {
+      // TODO(phase-3): Use Redlock or check-and-delete Lua script for multi-instance safety.
+      // Current simple DEL does not verify lock ownership; safe for single-instance MVP.
       try {
         await cache.del(lockKey);
       } catch (err: unknown) {
