@@ -3,6 +3,8 @@ import helmet from "@fastify/helmet";
 import cors from "@fastify/cors";
 import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
+import swagger from "@fastify/swagger";
+import scalarApiReference from "@scalar/fastify-api-reference";
 import * as Sentry from "@sentry/node";
 import type { FastifyError } from "fastify";
 import type { NodeOAuthClient } from "@atproto/oauth-client-node";
@@ -19,6 +21,8 @@ import healthRoutes from "./routes/health.js";
 import { oauthMetadataRoutes } from "./routes/oauth-metadata.js";
 import { authRoutes } from "./routes/auth.js";
 import { setupRoutes } from "./routes/setup.js";
+import { topicRoutes } from "./routes/topics.js";
+import { replyRoutes } from "./routes/replies.js";
 import { createSetupService } from "./setup/service.js";
 import type { SetupService } from "./setup/service.js";
 import type { Database } from "./db/index.js";
@@ -78,11 +82,11 @@ export async function buildApp(env: Env) {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
         imgSrc: ["'self'", "data:", "https:"],
         connectSrc: ["'self'"],
-        fontSrc: ["'self'"],
+        fontSrc: ["'self'", "https://cdn.jsdelivr.net"],
         objectSrc: ["'none'"],
         frameSrc: ["'none'"],
       },
@@ -131,11 +135,55 @@ export async function buildApp(env: Env) {
   const setupService = createSetupService(db, app.log);
   app.decorate("setupService", setupService);
 
+  // OpenAPI documentation (register before routes so schemas are collected)
+  await app.register(swagger, {
+    openapi: {
+      openapi: "3.1.0",
+      info: {
+        title: "Barazo Forum API",
+        description:
+          "AT Protocol forum AppView -- portable identity, federated communities.",
+        version: "0.1.0",
+      },
+      servers: [
+        {
+          url: env.CORS_ORIGINS.split(",")[0]?.trim() ?? "http://localhost:3000",
+          description: "Primary server",
+        },
+      ],
+      components: {
+        securitySchemes: {
+          bearerAuth: {
+            type: "http",
+            scheme: "bearer",
+            description: "Access token from /api/auth/callback or /api/auth/refresh",
+          },
+        },
+      },
+    },
+  });
+
+  await app.register(scalarApiReference, {
+    routePrefix: "/docs",
+    configuration: {
+      theme: "kepler",
+    },
+  });
+
   // Routes
   await app.register(healthRoutes);
   await app.register(oauthMetadataRoutes(oauthClient));
   await app.register(authRoutes(oauthClient));
   await app.register(setupRoutes());
+  await app.register(topicRoutes());
+  await app.register(replyRoutes());
+
+  // OpenAPI spec endpoint (after routes so all schemas are registered)
+  app.get("/api/openapi.json", { schema: { hide: true } }, async (_request, reply) => {
+    return reply
+      .header("Content-Type", "application/json")
+      .send(app.swagger());
+  });
 
   // Start firehose when app is ready
   app.addHook("onReady", async () => {

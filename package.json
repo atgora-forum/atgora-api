@@ -28,14 +28,16 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@barazo-forum/lexicons": "^0.1.0",
     "@atproto/api": "^0.18.21",
     "@atproto/oauth-client-node": "^0.3.16",
     "@atproto/tap": "^0.2.3",
+    "@barazo-forum/lexicons": "^0.1.0",
     "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^11.0.0",
     "@fastify/helmet": "^13.0.0",
     "@fastify/rate-limit": "^10.2.0",
+    "@fastify/swagger": "^9.7.0",
+    "@scalar/fastify-api-reference": "^1.44.18",
     "@sentry/node": "^9.27.0",
     "drizzle-orm": "^0.45.1",
     "fastify": "^5.7.4",
