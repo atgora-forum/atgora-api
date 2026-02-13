@@ -43,6 +43,13 @@
       "when": 1771007702170,
       "tag": "0005_silly_smasher",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1771008541415,
+      "tag": "0006_absent_domino",
+      "breakpoints": true
     }
   ]
 }

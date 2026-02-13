@@ -5,6 +5,7 @@ import {
   timestamp,
   index,
   uniqueIndex,
+  foreignKey,
 } from "drizzle-orm/pg-core";
 
 export const categories = pgTable(
@@ -37,5 +38,10 @@ export const categories = pgTable(
     index("categories_parent_id_idx").on(table.parentId),
     index("categories_community_did_idx").on(table.communityDid),
     index("categories_maturity_rating_idx").on(table.maturityRating),
+    foreignKey({
+      columns: [table.parentId],
+      foreignColumns: [table.id],
+      name: "categories_parent_id_fk",
+    }).onDelete("set null"),
   ],
 );
