@@ -1,11 +1,14 @@
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, inArray } from "drizzle-orm";
 import type { FastifyPluginCallback } from "fastify";
 import { createPdsClient } from "../lib/pds-client.js";
 import { notFound, forbidden, badRequest } from "../lib/api-errors.js";
+import { resolveMaxMaturity, allowedRatings } from "../lib/content-filter.js";
+import type { MaturityUser } from "../lib/content-filter.js";
 import { createTopicSchema, updateTopicSchema, topicQuerySchema } from "../validation/topics.js";
 import { topics } from "../db/schema/topics.js";
 import { replies } from "../db/schema/replies.js";
 import { users } from "../db/schema/users.js";
+import { categories } from "../db/schema/categories.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -287,7 +290,45 @@ export function topicRoutes(): FastifyPluginCallback {
       const { cursor, limit, category, tag } = parsed.data;
       const conditions = [];
 
-      // Category filter
+      // Maturity filtering: resolve user's max allowed maturity level
+      let userProfile: MaturityUser | undefined;
+      if (request.user) {
+        const userRows = await db
+          .select({ ageDeclaredAt: users.ageDeclaredAt, maturityPref: users.maturityPref })
+          .from(users)
+          .where(eq(users.did, request.user.did));
+        const row = userRows[0];
+        if (row) {
+          userProfile = row;
+        }
+      }
+
+      const maxMaturity = resolveMaxMaturity(userProfile);
+      const allowed = allowedRatings(maxMaturity);
+      const communityDid = env.COMMUNITY_DID ?? "did:plc:placeholder";
+
+      // Get category slugs matching allowed maturity levels
+      const allowedCategories = await db
+        .select({ slug: categories.slug })
+        .from(categories)
+        .where(
+          and(
+            eq(categories.communityDid, communityDid),
+            inArray(categories.maturityRating, allowed),
+          ),
+        );
+
+      const allowedSlugs = allowedCategories.map((c) => c.slug);
+
+      // If no categories are allowed, return empty result
+      if (allowedSlugs.length === 0) {
+        return reply.status(200).send({ topics: [], cursor: null });
+      }
+
+      // Filter topics to only those in allowed categories
+      conditions.push(inArray(topics.category, allowedSlugs));
+
+      // Category filter (explicit user filter, further narrows results)
       if (category) {
         conditions.push(eq(topics.category, category));
       }

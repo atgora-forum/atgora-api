@@ -17,4 +17,9 @@ export const users = pgTable("users", {
     .notNull()
     .defaultNow(),
   ageDeclaredAt: timestamp("age_declared_at", { withTimezone: true }),
+  maturityPref: text("maturity_pref", {
+    enum: ["safe", "mature", "adult"],
+  })
+    .notNull()
+    .default("safe"),
 });
