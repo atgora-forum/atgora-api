@@ -15,6 +15,20 @@
       "when": 1770943431138,
       "tag": "0001_aromatic_whirlwind",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1770946674704,
+      "tag": "0002_illegal_red_skull",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1770966988954,
+      "tag": "0003_flowery_wilson_fisk",
+      "breakpoints": true
     }
   ]
 }
