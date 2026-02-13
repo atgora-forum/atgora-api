@@ -2,6 +2,9 @@
 CLAUDE.md
 .claude/
 
+# Git worktrees
+.worktrees/
+
 # Logs
 logs
 *.log
