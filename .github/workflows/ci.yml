@@ -92,6 +92,9 @@ jobs:
       - run: pnpm install
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: pnpm db:migrate
+        env:
+          DATABASE_URL: postgresql://atgora:atgora_dev@localhost:5432/atgora
       - run: pnpm test:integration
         env:
           DATABASE_URL: postgresql://atgora:atgora_dev@localhost:5432/atgora
