@@ -1,0 +1,70 @@
+import { describe, it, expect } from "vitest";
+import { getTableName, getTableColumns } from "drizzle-orm";
+import { topics } from "../../../../src/db/schema/topics.js";
+
+describe("topics schema", () => {
+  const columns = getTableColumns(topics);
+
+  it("has the correct table name", () => {
+    expect(getTableName(topics)).toBe("topics");
+  });
+
+  it("uses uri as primary key", () => {
+    expect(columns.uri.primary).toBe(true);
+  });
+
+  it("has all required columns", () => {
+    const columnNames = Object.keys(columns);
+
+    const expected = [
+      "uri",
+      "rkey",
+      "authorDid",
+      "title",
+      "content",
+      "contentFormat",
+      "category",
+      "tags",
+      "communityDid",
+      "cid",
+      "labels",
+      "replyCount",
+      "reactionCount",
+      "lastActivityAt",
+      "createdAt",
+      "indexedAt",
+      "embedding",
+    ];
+
+    for (const col of expected) {
+      expect(columnNames).toContain(col);
+    }
+  });
+
+  it("has non-nullable required columns", () => {
+    expect(columns.uri.notNull).toBe(true);
+    expect(columns.rkey.notNull).toBe(true);
+    expect(columns.authorDid.notNull).toBe(true);
+    expect(columns.title.notNull).toBe(true);
+    expect(columns.content.notNull).toBe(true);
+    expect(columns.category.notNull).toBe(true);
+    expect(columns.communityDid.notNull).toBe(true);
+    expect(columns.cid.notNull).toBe(true);
+  });
+
+  it("has nullable optional columns", () => {
+    expect(columns.contentFormat.notNull).toBe(false);
+    expect(columns.tags.notNull).toBe(false);
+    expect(columns.labels.notNull).toBe(false);
+    expect(columns.embedding.notNull).toBe(false);
+  });
+
+  it("has default values for counts", () => {
+    expect(columns.replyCount.hasDefault).toBe(true);
+    expect(columns.reactionCount.hasDefault).toBe(true);
+  });
+
+  it("has default values for timestamps", () => {
+    expect(columns.indexedAt.hasDefault).toBe(true);
+  });
+});

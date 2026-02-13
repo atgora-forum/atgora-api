@@ -1,6 +1,31 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { buildApp } from "../../../src/app.js";
 import type { FastifyInstance } from "fastify";
+
+// Mock @atproto/tap to avoid real network connections
+vi.mock("@atproto/tap", () => {
+  const mockChannel = {
+    start: vi.fn().mockResolvedValue(undefined),
+    destroy: vi.fn().mockResolvedValue(undefined),
+  };
+
+  class MockTap {
+    addRepos = vi.fn().mockResolvedValue(undefined);
+    removeRepos = vi.fn().mockResolvedValue(undefined);
+    channel = vi.fn().mockReturnValue(mockChannel);
+  }
+
+  class MockSimpleIndexer {
+    identity = vi.fn().mockReturnThis();
+    record = vi.fn().mockReturnThis();
+    error = vi.fn().mockReturnThis();
+  }
+
+  return {
+    Tap: MockTap,
+    SimpleIndexer: MockSimpleIndexer,
+  };
+});
 
 interface HealthResponse {
   status: string;
@@ -56,7 +81,7 @@ describe("health routes", () => {
   });
 
   describe("GET /api/health/ready", () => {
-    it("returns dependency check results", async () => {
+    it("returns dependency check results including firehose", async () => {
       const response = await app.inject({
         method: "GET",
         url: "/api/health/ready",
@@ -67,6 +92,7 @@ describe("health routes", () => {
       expect(body).toHaveProperty("checks");
       expect(body.checks).toHaveProperty("database");
       expect(body.checks).toHaveProperty("cache");
+      expect(body.checks).toHaveProperty("firehose");
     });
   });
 });

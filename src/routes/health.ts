@@ -37,6 +37,15 @@ const healthRoutes: FastifyPluginCallback = (fastify, _opts, done) => {
       checks["cache"] = { status: "unhealthy" };
     }
 
+    // Check firehose
+    const firehoseStatus = fastify.firehose.getStatus();
+    checks["firehose"] = {
+      status: firehoseStatus.connected ? "healthy" : "unhealthy",
+      ...(firehoseStatus.lastEventId !== null
+        ? { latency: firehoseStatus.lastEventId }
+        : {}),
+    };
+
     const allHealthy = Object.values(checks).every(
       (c) => c.status === "healthy",
     );

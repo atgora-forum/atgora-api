@@ -7,6 +7,7 @@ import type { FastifyError } from "fastify";
 import type { Env } from "./config/env.js";
 import { createDb } from "./db/index.js";
 import { createCache } from "./cache/index.js";
+import { FirehoseService } from "./firehose/service.js";
 import healthRoutes from "./routes/health.js";
 import type { Database } from "./db/index.js";
 import type { Cache } from "./cache/index.js";
@@ -17,6 +18,7 @@ declare module "fastify" {
     db: Database;
     cache: Cache;
     env: Env;
+    firehose: FirehoseService;
   }
 }
 
@@ -50,6 +52,10 @@ export async function buildApp(env: Env) {
   // Cache
   const cache = createCache(env.VALKEY_URL, app.log);
   app.decorate("cache", cache);
+
+  // Firehose
+  const firehose = new FirehoseService(db, app.log, env);
+  app.decorate("firehose", firehose);
 
   // Security headers
   await app.register(helmet, {
@@ -89,9 +95,15 @@ export async function buildApp(env: Env) {
   // Routes
   await app.register(healthRoutes);
 
-  // Graceful shutdown
+  // Start firehose when app is ready
+  app.addHook("onReady", async () => {
+    await firehose.start();
+  });
+
+  // Graceful shutdown: stop firehose before closing DB
   app.addHook("onClose", async () => {
     app.log.info("Shutting down...");
+    await firehose.stop();
     await cache.quit();
     await dbClient.end();
     app.log.info("Connections closed");
