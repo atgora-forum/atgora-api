@@ -20,6 +20,7 @@ describe("communitySettings schema", () => {
       "id",
       "initialized",
       "communityDid",
+      "adminDid",
       "communityName",
       "createdAt",
       "updatedAt",
@@ -40,6 +41,10 @@ describe("communitySettings schema", () => {
 
   it("has nullable communityDid", () => {
     expect(columns.communityDid.notNull).toBe(false);
+  });
+
+  it("has nullable adminDid", () => {
+    expect(columns.adminDid.notNull).toBe(false);
   });
 
   it("has default value for communityName", () => {

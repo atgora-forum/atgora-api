@@ -18,6 +18,9 @@ import type { AuthMiddleware, RequestUser } from "./auth/middleware.js";
 import healthRoutes from "./routes/health.js";
 import { oauthMetadataRoutes } from "./routes/oauth-metadata.js";
 import { authRoutes } from "./routes/auth.js";
+import { setupRoutes } from "./routes/setup.js";
+import { createSetupService } from "./setup/service.js";
+import type { SetupService } from "./setup/service.js";
 import type { Database } from "./db/index.js";
 import type { Cache } from "./cache/index.js";
 
@@ -31,6 +34,7 @@ declare module "fastify" {
     oauthClient: NodeOAuthClient;
     sessionService: SessionService;
     authMiddleware: AuthMiddleware;
+    setupService: SetupService;
   }
 }
 
@@ -123,10 +127,15 @@ export async function buildApp(env: Env) {
   const authMiddleware = createAuthMiddleware(sessionService, app.log);
   app.decorate("authMiddleware", authMiddleware);
 
+  // Setup service
+  const setupService = createSetupService(db, app.log);
+  app.decorate("setupService", setupService);
+
   // Routes
   await app.register(healthRoutes);
   await app.register(oauthMetadataRoutes(oauthClient));
   await app.register(authRoutes(oauthClient));
+  await app.register(setupRoutes());
 
   // Start firehose when app is ready
   app.addHook("onReady", async () => {
