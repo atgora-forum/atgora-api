@@ -4,6 +4,7 @@ import {
   integer,
   timestamp,
   jsonb,
+  boolean,
   index,
 } from "drizzle-orm/pg-core";
 
@@ -30,6 +31,9 @@ export const topics = pgTable(
     indexedAt: timestamp("indexed_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    isLocked: boolean("is_locked").notNull().default(false),
+    isPinned: boolean("is_pinned").notNull().default(false),
+    isModDeleted: boolean("is_mod_deleted").notNull().default(false),
     embedding: text("embedding"),
   },
   (table) => [

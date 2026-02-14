@@ -67,4 +67,19 @@ describe("topics schema", () => {
   it("has default values for timestamps", () => {
     expect(columns.indexedAt.hasDefault).toBe(true);
   });
+
+  it("has moderation flag columns with defaults", () => {
+    const columnNames = Object.keys(columns);
+    expect(columnNames).toContain("isLocked");
+    expect(columnNames).toContain("isPinned");
+    expect(columnNames).toContain("isModDeleted");
+
+    expect(columns.isLocked.notNull).toBe(true);
+    expect(columns.isPinned.notNull).toBe(true);
+    expect(columns.isModDeleted.notNull).toBe(true);
+
+    expect(columns.isLocked.hasDefault).toBe(true);
+    expect(columns.isPinned.hasDefault).toBe(true);
+    expect(columns.isModDeleted.hasDefault).toBe(true);
+  });
 });

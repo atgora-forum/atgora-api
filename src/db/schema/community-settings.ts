@@ -15,6 +15,14 @@ export const communitySettings = pgTable("community_settings", {
     .$type<string[]>()
     .notNull()
     .default(["like"]),
+  moderationThresholds: jsonb("moderation_thresholds")
+    .$type<{ autoBlockReportCount: number; warnThreshold: number }>()
+    .notNull()
+    .default({ autoBlockReportCount: 5, warnThreshold: 3 }),
+  wordFilter: jsonb("word_filter")
+    .$type<string[]>()
+    .notNull()
+    .default([]),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
