@@ -60,6 +60,11 @@ export const envSchema = z.object({
 
   // Optional: semantic search
   EMBEDDING_URL: z.string().optional(),
+  AI_EMBEDDING_DIMENSIONS: z
+    .string()
+    .default("768")
+    .transform((val) => Number(val))
+    .pipe(z.number().int().min(384).max(1536)),
 });
 
 export type Env = z.infer<typeof envSchema>;
