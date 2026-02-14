@@ -8,3 +8,4 @@ export { communitySettings } from "./community-settings.js";
 export { categories } from "./categories.js";
 export { moderationActions } from "./moderation-actions.js";
 export { reports } from "./reports.js";
+export { notifications } from "./notifications.js";
