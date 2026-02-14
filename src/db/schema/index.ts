@@ -9,3 +9,4 @@ export { categories } from "./categories.js";
 export { moderationActions } from "./moderation-actions.js";
 export { reports } from "./reports.js";
 export { notifications } from "./notifications.js";
+export { userPreferences, userCommunityPreferences } from "./user-preferences.js";

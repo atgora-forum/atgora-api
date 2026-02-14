@@ -1,0 +1,864 @@
+import { eq, and, sql } from "drizzle-orm";
+import type { FastifyPluginCallback } from "fastify";
+import { notFound, badRequest } from "../lib/api-errors.js";
+import {
+  userPreferencesSchema,
+  communityPreferencesSchema,
+  ageDeclarationSchema,
+} from "../validation/profiles.js";
+import { users } from "../db/schema/users.js";
+import { topics } from "../db/schema/topics.js";
+import { replies } from "../db/schema/replies.js";
+import { reactions } from "../db/schema/reactions.js";
+import { notifications } from "../db/schema/notifications.js";
+import { reports } from "../db/schema/reports.js";
+import {
+  userPreferences,
+  userCommunityPreferences,
+} from "../db/schema/user-preferences.js";
+
+// ---------------------------------------------------------------------------
+// OpenAPI JSON Schema definitions
+// ---------------------------------------------------------------------------
+
+const errorJsonSchema = {
+  type: "object" as const,
+  properties: {
+    error: { type: "string" as const },
+  },
+};
+
+const profileJsonSchema = {
+  type: "object" as const,
+  properties: {
+    did: { type: "string" as const },
+    handle: { type: "string" as const },
+    displayName: { type: ["string", "null"] as const },
+    avatarUrl: { type: ["string", "null"] as const },
+    role: { type: "string" as const },
+    firstSeenAt: { type: "string" as const, format: "date-time" as const },
+    lastActiveAt: { type: "string" as const, format: "date-time" as const },
+    activity: {
+      type: "object" as const,
+      properties: {
+        topicCount: { type: "number" as const },
+        replyCount: { type: "number" as const },
+        reactionsReceived: { type: "number" as const },
+      },
+    },
+  },
+};
+
+const reputationJsonSchema = {
+  type: "object" as const,
+  properties: {
+    did: { type: "string" as const },
+    handle: { type: "string" as const },
+    reputation: { type: "number" as const },
+    breakdown: {
+      type: "object" as const,
+      properties: {
+        topicCount: { type: "number" as const },
+        replyCount: { type: "number" as const },
+        reactionsReceived: { type: "number" as const },
+      },
+    },
+  },
+};
+
+const preferencesJsonSchema = {
+  type: "object" as const,
+  properties: {
+    maturityLevel: { type: "string" as const },
+    ageDeclarationAt: {
+      type: ["string", "null"] as const,
+      format: "date-time" as const,
+    },
+    mutedWords: { type: "array" as const, items: { type: "string" as const } },
+    blockedDids: {
+      type: "array" as const,
+      items: { type: "string" as const },
+    },
+    mutedDids: { type: "array" as const, items: { type: "string" as const } },
+    crossPostBluesky: { type: "boolean" as const },
+    crossPostFrontpage: { type: "boolean" as const },
+    updatedAt: { type: "string" as const, format: "date-time" as const },
+  },
+};
+
+const communityPrefsJsonSchema = {
+  type: "object" as const,
+  properties: {
+    communityDid: { type: "string" as const },
+    maturityOverride: { type: ["string", "null"] as const },
+    mutedWords: {
+      type: ["array", "null"] as const,
+      items: { type: "string" as const },
+    },
+    blockedDids: {
+      type: ["array", "null"] as const,
+      items: { type: "string" as const },
+    },
+    mutedDids: {
+      type: ["array", "null"] as const,
+      items: { type: "string" as const },
+    },
+    notificationPrefs: {
+      type: ["object", "null"] as const,
+      properties: {
+        replies: { type: "boolean" as const },
+        reactions: { type: "boolean" as const },
+        mentions: { type: "boolean" as const },
+        modActions: { type: "boolean" as const },
+      },
+    },
+    updatedAt: { type: "string" as const, format: "date-time" as const },
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Default global preferences returned when no row exists yet. */
+function defaultPreferences() {
+  return {
+    maturityLevel: "sfw" as const,
+    ageDeclarationAt: null,
+    mutedWords: [] as string[],
+    blockedDids: [] as string[],
+    mutedDids: [] as string[],
+    crossPostBluesky: false,
+    crossPostFrontpage: false,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+/** Default per-community preferences returned when no row exists yet. */
+function defaultCommunityPreferences(communityDid: string) {
+  return {
+    communityDid,
+    maturityOverride: null,
+    mutedWords: null,
+    blockedDids: null,
+    mutedDids: null,
+    notificationPrefs: null,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Profile routes plugin
+// ---------------------------------------------------------------------------
+
+/**
+ * Profile, reputation, and preferences routes for the Barazo forum.
+ *
+ * - GET    /api/users/:handle                              -- Public profile
+ * - GET    /api/users/:handle/reputation                   -- Reputation score
+ * - POST   /api/users/me/age-declaration                   -- Declare age
+ * - GET    /api/users/me/preferences                       -- Global preferences
+ * - PUT    /api/users/me/preferences                       -- Update global preferences
+ * - GET    /api/users/me/communities/:communityId/preferences -- Per-community prefs
+ * - PUT    /api/users/me/communities/:communityId/preferences -- Update per-community prefs
+ * - DELETE /api/users/me                                   -- GDPR Art. 17 purge
+ */
+export function profileRoutes(): FastifyPluginCallback {
+  return (app, _opts, done) => {
+    const { db, authMiddleware } = app;
+
+    // -------------------------------------------------------------------
+    // GET /api/users/:handle (public, optionalAuth)
+    // -------------------------------------------------------------------
+
+    app.get(
+      "/api/users/:handle",
+      {
+        preHandler: [authMiddleware.optionalAuth],
+        schema: {
+          tags: ["Profiles"],
+          summary: "Get user profile and activity summary",
+          params: {
+            type: "object",
+            required: ["handle"],
+            properties: {
+              handle: { type: "string" },
+            },
+          },
+          response: {
+            200: profileJsonSchema,
+            404: errorJsonSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const { handle } = request.params as { handle: string };
+
+        // Look up user by handle
+        const userRows = await db
+          .select()
+          .from(users)
+          .where(eq(users.handle, handle));
+
+        const user = userRows[0];
+        if (!user) {
+          throw notFound("User not found");
+        }
+
+        // Aggregate activity counts
+        const topicCountResult = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(topics)
+          .where(eq(topics.authorDid, user.did));
+
+        const replyCountResult = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(replies)
+          .where(eq(replies.authorDid, user.did));
+
+        // Count reactions received on user's topics and replies
+        const reactionsOnTopicsResult = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(reactions)
+          .where(
+            sql`${reactions.subjectUri} IN (SELECT ${topics.uri} FROM ${topics} WHERE ${topics.authorDid} = ${user.did})`,
+          );
+
+        const reactionsOnRepliesResult = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(reactions)
+          .where(
+            sql`${reactions.subjectUri} IN (SELECT ${replies.uri} FROM ${replies} WHERE ${replies.authorDid} = ${user.did})`,
+          );
+
+        const topicCount = topicCountResult[0]?.count ?? 0;
+        const replyCount = replyCountResult[0]?.count ?? 0;
+        const reactionsReceived =
+          (reactionsOnTopicsResult[0]?.count ?? 0) +
+          (reactionsOnRepliesResult[0]?.count ?? 0);
+
+        return reply.status(200).send({
+          did: user.did,
+          handle: user.handle,
+          displayName: user.displayName ?? null,
+          avatarUrl: user.avatarUrl ?? null,
+          role: user.role,
+          firstSeenAt: user.firstSeenAt.toISOString(),
+          lastActiveAt: user.lastActiveAt.toISOString(),
+          activity: {
+            topicCount,
+            replyCount,
+            reactionsReceived,
+          },
+        });
+      },
+    );
+
+    // -------------------------------------------------------------------
+    // GET /api/users/:handle/reputation (public)
+    // -------------------------------------------------------------------
+
+    app.get(
+      "/api/users/:handle/reputation",
+      {
+        preHandler: [authMiddleware.optionalAuth],
+        schema: {
+          tags: ["Profiles"],
+          summary: "Get user reputation score",
+          params: {
+            type: "object",
+            required: ["handle"],
+            properties: {
+              handle: { type: "string" },
+            },
+          },
+          response: {
+            200: reputationJsonSchema,
+            404: errorJsonSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const { handle } = request.params as { handle: string };
+
+        // Look up user by handle
+        const userRows = await db
+          .select()
+          .from(users)
+          .where(eq(users.handle, handle));
+
+        const user = userRows[0];
+        if (!user) {
+          throw notFound("User not found");
+        }
+
+        // Count topics
+        const topicCountResult = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(topics)
+          .where(eq(topics.authorDid, user.did));
+
+        // Count replies
+        const replyCountResult = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(replies)
+          .where(eq(replies.authorDid, user.did));
+
+        // Count reactions received
+        const reactionsOnTopicsResult = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(reactions)
+          .where(
+            sql`${reactions.subjectUri} IN (SELECT ${topics.uri} FROM ${topics} WHERE ${topics.authorDid} = ${user.did})`,
+          );
+
+        const reactionsOnRepliesResult = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(reactions)
+          .where(
+            sql`${reactions.subjectUri} IN (SELECT ${replies.uri} FROM ${replies} WHERE ${replies.authorDid} = ${user.did})`,
+          );
+
+        const topicCount = topicCountResult[0]?.count ?? 0;
+        const replyCount = replyCountResult[0]?.count ?? 0;
+        const reactionsReceived =
+          (reactionsOnTopicsResult[0]?.count ?? 0) +
+          (reactionsOnRepliesResult[0]?.count ?? 0);
+
+        // Reputation formula: (topics * 5) + (replies * 2) + (reactions_received * 1)
+        const reputation =
+          topicCount * 5 + replyCount * 2 + reactionsReceived * 1;
+
+        return reply.status(200).send({
+          did: user.did,
+          handle: user.handle,
+          reputation,
+          breakdown: {
+            topicCount,
+            replyCount,
+            reactionsReceived,
+          },
+        });
+      },
+    );
+
+    // -------------------------------------------------------------------
+    // POST /api/users/me/age-declaration (auth required)
+    // -------------------------------------------------------------------
+
+    app.post(
+      "/api/users/me/age-declaration",
+      {
+        preHandler: [authMiddleware.requireAuth],
+        schema: {
+          tags: ["Profiles"],
+          summary: "Declare age to unlock mature content access",
+          security: [{ bearerAuth: [] }],
+          body: {
+            type: "object",
+            required: ["confirm"],
+            properties: {
+              confirm: { type: "boolean", enum: [true] },
+            },
+          },
+          response: {
+            200: {
+              type: "object",
+              properties: {
+                success: { type: "boolean" },
+                ageDeclarationAt: {
+                  type: "string",
+                  format: "date-time",
+                },
+              },
+            },
+            400: errorJsonSchema,
+            401: errorJsonSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const requestUser = request.user;
+        if (!requestUser) {
+          return reply
+            .status(401)
+            .send({ error: "Authentication required" });
+        }
+
+        const parsed = ageDeclarationSchema.safeParse(request.body);
+        if (!parsed.success) {
+          throw badRequest("Body must include confirm: true");
+        }
+
+        const now = new Date();
+
+        // Upsert into user_preferences
+        await db
+          .insert(userPreferences)
+          .values({
+            did: requestUser.did,
+            ageDeclarationAt: now,
+            updatedAt: now,
+          })
+          .onConflictDoUpdate({
+            target: userPreferences.did,
+            set: {
+              ageDeclarationAt: now,
+              updatedAt: now,
+            },
+          });
+
+        return reply.status(200).send({
+          success: true,
+          ageDeclarationAt: now.toISOString(),
+        });
+      },
+    );
+
+    // -------------------------------------------------------------------
+    // GET /api/users/me/preferences (auth required)
+    // -------------------------------------------------------------------
+
+    app.get(
+      "/api/users/me/preferences",
+      {
+        preHandler: [authMiddleware.requireAuth],
+        schema: {
+          tags: ["Profiles"],
+          summary: "Get global user preferences",
+          security: [{ bearerAuth: [] }],
+          response: {
+            200: preferencesJsonSchema,
+            401: errorJsonSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const requestUser = request.user;
+        if (!requestUser) {
+          return reply
+            .status(401)
+            .send({ error: "Authentication required" });
+        }
+
+        const rows = await db
+          .select()
+          .from(userPreferences)
+          .where(eq(userPreferences.did, requestUser.did));
+
+        const prefs = rows[0];
+        if (!prefs) {
+          return reply.status(200).send(defaultPreferences());
+        }
+
+        return reply.status(200).send({
+          maturityLevel: prefs.maturityLevel,
+          ageDeclarationAt: prefs.ageDeclarationAt?.toISOString() ?? null,
+          mutedWords: prefs.mutedWords,
+          blockedDids: prefs.blockedDids,
+          mutedDids: prefs.mutedDids,
+          crossPostBluesky: prefs.crossPostBluesky,
+          crossPostFrontpage: prefs.crossPostFrontpage,
+          updatedAt: prefs.updatedAt.toISOString(),
+        });
+      },
+    );
+
+    // -------------------------------------------------------------------
+    // PUT /api/users/me/preferences (auth required)
+    // -------------------------------------------------------------------
+
+    app.put(
+      "/api/users/me/preferences",
+      {
+        preHandler: [authMiddleware.requireAuth],
+        schema: {
+          tags: ["Profiles"],
+          summary: "Update global user preferences",
+          security: [{ bearerAuth: [] }],
+          body: {
+            type: "object",
+            properties: {
+              maturityLevel: { type: "string", enum: ["sfw", "mature"] },
+              mutedWords: {
+                type: "array",
+                items: { type: "string" },
+              },
+              blockedDids: {
+                type: "array",
+                items: { type: "string" },
+              },
+              mutedDids: {
+                type: "array",
+                items: { type: "string" },
+              },
+              crossPostBluesky: { type: "boolean" },
+              crossPostFrontpage: { type: "boolean" },
+            },
+          },
+          response: {
+            200: preferencesJsonSchema,
+            400: errorJsonSchema,
+            401: errorJsonSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const requestUser = request.user;
+        if (!requestUser) {
+          return reply
+            .status(401)
+            .send({ error: "Authentication required" });
+        }
+
+        const parsed = userPreferencesSchema.safeParse(request.body);
+        if (!parsed.success) {
+          throw badRequest("Invalid preferences data");
+        }
+
+        const now = new Date();
+        const updateData: Record<string, unknown> = { updatedAt: now };
+
+        if (parsed.data.maturityLevel !== undefined) {
+          updateData["maturityLevel"] = parsed.data.maturityLevel;
+        }
+        if (parsed.data.mutedWords !== undefined) {
+          updateData["mutedWords"] = parsed.data.mutedWords;
+        }
+        if (parsed.data.blockedDids !== undefined) {
+          updateData["blockedDids"] = parsed.data.blockedDids;
+        }
+        if (parsed.data.mutedDids !== undefined) {
+          updateData["mutedDids"] = parsed.data.mutedDids;
+        }
+        if (parsed.data.crossPostBluesky !== undefined) {
+          updateData["crossPostBluesky"] = parsed.data.crossPostBluesky;
+        }
+        if (parsed.data.crossPostFrontpage !== undefined) {
+          updateData["crossPostFrontpage"] = parsed.data.crossPostFrontpage;
+        }
+
+        // Upsert
+        await db
+          .insert(userPreferences)
+          .values({
+            did: requestUser.did,
+            ...parsed.data,
+            updatedAt: now,
+          })
+          .onConflictDoUpdate({
+            target: userPreferences.did,
+            set: updateData,
+          });
+
+        // Fetch the updated row
+        const rows = await db
+          .select()
+          .from(userPreferences)
+          .where(eq(userPreferences.did, requestUser.did));
+
+        const prefs = rows[0];
+        if (!prefs) {
+          return reply.status(200).send(defaultPreferences());
+        }
+
+        return reply.status(200).send({
+          maturityLevel: prefs.maturityLevel,
+          ageDeclarationAt: prefs.ageDeclarationAt?.toISOString() ?? null,
+          mutedWords: prefs.mutedWords,
+          blockedDids: prefs.blockedDids,
+          mutedDids: prefs.mutedDids,
+          crossPostBluesky: prefs.crossPostBluesky,
+          crossPostFrontpage: prefs.crossPostFrontpage,
+          updatedAt: prefs.updatedAt.toISOString(),
+        });
+      },
+    );
+
+    // -------------------------------------------------------------------
+    // GET /api/users/me/communities/:communityId/preferences (auth required)
+    // -------------------------------------------------------------------
+
+    app.get(
+      "/api/users/me/communities/:communityId/preferences",
+      {
+        preHandler: [authMiddleware.requireAuth],
+        schema: {
+          tags: ["Profiles"],
+          summary: "Get per-community user preferences",
+          security: [{ bearerAuth: [] }],
+          params: {
+            type: "object",
+            required: ["communityId"],
+            properties: {
+              communityId: { type: "string" },
+            },
+          },
+          response: {
+            200: communityPrefsJsonSchema,
+            401: errorJsonSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const requestUser = request.user;
+        if (!requestUser) {
+          return reply
+            .status(401)
+            .send({ error: "Authentication required" });
+        }
+
+        const { communityId } = request.params as { communityId: string };
+
+        const rows = await db
+          .select()
+          .from(userCommunityPreferences)
+          .where(
+            and(
+              eq(userCommunityPreferences.did, requestUser.did),
+              eq(userCommunityPreferences.communityDid, communityId),
+            ),
+          );
+
+        const prefs = rows[0];
+        if (!prefs) {
+          return reply
+            .status(200)
+            .send(defaultCommunityPreferences(communityId));
+        }
+
+        return reply.status(200).send({
+          communityDid: prefs.communityDid,
+          maturityOverride: prefs.maturityOverride ?? null,
+          mutedWords: prefs.mutedWords ?? null,
+          blockedDids: prefs.blockedDids ?? null,
+          mutedDids: prefs.mutedDids ?? null,
+          notificationPrefs: prefs.notificationPrefs ?? null,
+          updatedAt: prefs.updatedAt.toISOString(),
+        });
+      },
+    );
+
+    // -------------------------------------------------------------------
+    // PUT /api/users/me/communities/:communityId/preferences (auth required)
+    // -------------------------------------------------------------------
+
+    app.put(
+      "/api/users/me/communities/:communityId/preferences",
+      {
+        preHandler: [authMiddleware.requireAuth],
+        schema: {
+          tags: ["Profiles"],
+          summary: "Update per-community user preferences",
+          security: [{ bearerAuth: [] }],
+          params: {
+            type: "object",
+            required: ["communityId"],
+            properties: {
+              communityId: { type: "string" },
+            },
+          },
+          body: {
+            type: "object",
+            properties: {
+              maturityOverride: {
+                type: ["string", "null"],
+                enum: ["sfw", "mature", null],
+              },
+              mutedWords: {
+                type: ["array", "null"],
+                items: { type: "string" },
+              },
+              blockedDids: {
+                type: ["array", "null"],
+                items: { type: "string" },
+              },
+              mutedDids: {
+                type: ["array", "null"],
+                items: { type: "string" },
+              },
+              notificationPrefs: {
+                type: ["object", "null"],
+                properties: {
+                  replies: { type: "boolean" },
+                  reactions: { type: "boolean" },
+                  mentions: { type: "boolean" },
+                  modActions: { type: "boolean" },
+                },
+              },
+            },
+          },
+          response: {
+            200: communityPrefsJsonSchema,
+            400: errorJsonSchema,
+            401: errorJsonSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const requestUser = request.user;
+        if (!requestUser) {
+          return reply
+            .status(401)
+            .send({ error: "Authentication required" });
+        }
+
+        const { communityId } = request.params as { communityId: string };
+
+        const parsed = communityPreferencesSchema.safeParse(request.body);
+        if (!parsed.success) {
+          throw badRequest("Invalid community preferences data");
+        }
+
+        const now = new Date();
+        const updateData: Record<string, unknown> = { updatedAt: now };
+
+        if (parsed.data.maturityOverride !== undefined) {
+          updateData["maturityOverride"] = parsed.data.maturityOverride;
+        }
+        if (parsed.data.mutedWords !== undefined) {
+          updateData["mutedWords"] = parsed.data.mutedWords;
+        }
+        if (parsed.data.blockedDids !== undefined) {
+          updateData["blockedDids"] = parsed.data.blockedDids;
+        }
+        if (parsed.data.mutedDids !== undefined) {
+          updateData["mutedDids"] = parsed.data.mutedDids;
+        }
+        if (parsed.data.notificationPrefs !== undefined) {
+          updateData["notificationPrefs"] = parsed.data.notificationPrefs;
+        }
+
+        // Upsert: use composite key (did, communityDid)
+        await db
+          .insert(userCommunityPreferences)
+          .values({
+            did: requestUser.did,
+            communityDid: communityId,
+            ...parsed.data,
+            updatedAt: now,
+          })
+          .onConflictDoUpdate({
+            target: [
+              userCommunityPreferences.did,
+              userCommunityPreferences.communityDid,
+            ],
+            set: updateData,
+          });
+
+        // Fetch updated row
+        const rows = await db
+          .select()
+          .from(userCommunityPreferences)
+          .where(
+            and(
+              eq(userCommunityPreferences.did, requestUser.did),
+              eq(userCommunityPreferences.communityDid, communityId),
+            ),
+          );
+
+        const prefs = rows[0];
+        if (!prefs) {
+          return reply
+            .status(200)
+            .send(defaultCommunityPreferences(communityId));
+        }
+
+        return reply.status(200).send({
+          communityDid: prefs.communityDid,
+          maturityOverride: prefs.maturityOverride ?? null,
+          mutedWords: prefs.mutedWords ?? null,
+          blockedDids: prefs.blockedDids ?? null,
+          mutedDids: prefs.mutedDids ?? null,
+          notificationPrefs: prefs.notificationPrefs ?? null,
+          updatedAt: prefs.updatedAt.toISOString(),
+        });
+      },
+    );
+
+    // -------------------------------------------------------------------
+    // DELETE /api/users/me (auth required) -- GDPR Art. 17 purge
+    // -------------------------------------------------------------------
+
+    app.delete(
+      "/api/users/me",
+      {
+        preHandler: [authMiddleware.requireAuth],
+        schema: {
+          tags: ["Profiles"],
+          summary:
+            "Delete all indexed data for the authenticated user (GDPR Art. 17)",
+          security: [{ bearerAuth: [] }],
+          response: {
+            204: { type: "null" },
+            401: errorJsonSchema,
+          },
+        },
+      },
+      async (request, reply) => {
+        const requestUser = request.user;
+        if (!requestUser) {
+          return reply
+            .status(401)
+            .send({ error: "Authentication required" });
+        }
+
+        const userDid = requestUser.did;
+
+        await db.transaction(async (tx) => {
+          // Delete reactions by this user
+          await tx
+            .delete(reactions)
+            .where(eq(reactions.authorDid, userDid));
+
+          // Delete notifications for/by this user
+          await tx
+            .delete(notifications)
+            .where(eq(notifications.recipientDid, userDid));
+          await tx
+            .delete(notifications)
+            .where(eq(notifications.actorDid, userDid));
+
+          // Delete reports filed by this user
+          await tx
+            .delete(reports)
+            .where(eq(reports.reporterDid, userDid));
+
+          // Delete replies by this user
+          await tx
+            .delete(replies)
+            .where(eq(replies.authorDid, userDid));
+
+          // Delete topics by this user
+          await tx
+            .delete(topics)
+            .where(eq(topics.authorDid, userDid));
+
+          // Delete community preferences
+          await tx
+            .delete(userCommunityPreferences)
+            .where(eq(userCommunityPreferences.did, userDid));
+
+          // Delete global preferences
+          await tx
+            .delete(userPreferences)
+            .where(eq(userPreferences.did, userDid));
+
+          // Delete user record
+          await tx
+            .delete(users)
+            .where(eq(users.did, userDid));
+        });
+
+        app.log.info(
+          { did: userDid },
+          "GDPR Art. 17: all indexed data purged for user",
+        );
+
+        return reply.status(204).send();
+      },
+    );
+
+    done();
+  };
+}
