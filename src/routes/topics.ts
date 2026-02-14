@@ -1,4 +1,4 @@
-import { eq, and, desc, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, sql, inArray, notInArray, isNotNull } from "drizzle-orm";
 import type { FastifyPluginCallback } from "fastify";
 import { createPdsClient } from "../lib/pds-client.js";
 import { notFound, forbidden, badRequest } from "../lib/api-errors.js";
@@ -6,10 +6,12 @@ import { resolveMaxMaturity, allowedRatings, maturityAllows } from "../lib/conte
 import type { MaturityUser } from "../lib/content-filter.js";
 import { createTopicSchema, updateTopicSchema, topicQuerySchema } from "../validation/topics.js";
 import { createCrossPostService } from "../services/cross-post.js";
+import { loadBlockMuteLists } from "../lib/block-mute.js";
 import { topics } from "../db/schema/topics.js";
 import { replies } from "../db/schema/replies.js";
 import { users } from "../db/schema/users.js";
 import { categories } from "../db/schema/categories.js";
+import { communitySettings } from "../db/schema/community-settings.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -48,6 +50,7 @@ const topicJsonSchema = {
     cid: { type: "string" as const },
     replyCount: { type: "integer" as const },
     reactionCount: { type: "integer" as const },
+    isMuted: { type: "boolean" as const },
     lastActivityAt: { type: "string" as const, format: "date-time" as const },
     createdAt: { type: "string" as const, format: "date-time" as const },
     indexedAt: { type: "string" as const, format: "date-time" as const },
@@ -378,28 +381,90 @@ export function topicRoutes(): FastifyPluginCallback {
 
       const maxMaturity = resolveMaxMaturity(userProfile);
       const allowed = allowedRatings(maxMaturity);
-      const communityDid = env.COMMUNITY_DID ?? "did:plc:placeholder";
 
-      // Get category slugs matching allowed maturity levels
-      const allowedCategories = await db
-        .select({ slug: categories.slug })
-        .from(categories)
-        .where(
-          and(
-            eq(categories.communityDid, communityDid),
-            inArray(categories.maturityRating, allowed),
-          ),
-        );
+      if (env.COMMUNITY_MODE === "global") {
+        // ---------------------------------------------------------------
+        // Global mode: multi-community filtering
+        // ---------------------------------------------------------------
 
-      const allowedSlugs = allowedCategories.map((c) => c.slug);
+        // Get all community settings with a valid communityDid
+        const communityRows = await db
+          .select({
+            communityDid: communitySettings.communityDid,
+            maturityRating: communitySettings.maturityRating,
+          })
+          .from(communitySettings)
+          .where(isNotNull(communitySettings.communityDid));
 
-      // If no categories are allowed, return empty result
-      if (allowedSlugs.length === 0) {
-        return reply.status(200).send({ topics: [], cursor: null });
+        // Filter: NEVER show adult communities in global mode,
+        // check mature communities against user's max maturity preference
+        const allowedCommunityDids = communityRows
+          .filter((c) => {
+            if (!c.communityDid) return false;
+            if (c.maturityRating === "adult") return false;
+            return maturityAllows(maxMaturity, c.maturityRating);
+          })
+          .map((c) => c.communityDid!);
+
+        if (allowedCommunityDids.length === 0) {
+          return reply.status(200).send({ topics: [], cursor: null });
+        }
+
+        // Restrict topics to allowed communities
+        conditions.push(inArray(topics.communityDid, allowedCommunityDids));
+
+        // Also filter by category maturity across all allowed communities
+        const allowedCats = await db
+          .select({ slug: categories.slug })
+          .from(categories)
+          .where(
+            and(
+              inArray(categories.communityDid, allowedCommunityDids),
+              inArray(categories.maturityRating, allowed),
+            ),
+          );
+
+        const allowedSlugs = [...new Set(allowedCats.map((c) => c.slug))];
+        if (allowedSlugs.length === 0) {
+          return reply.status(200).send({ topics: [], cursor: null });
+        }
+        conditions.push(inArray(topics.category, allowedSlugs));
+      } else {
+        // ---------------------------------------------------------------
+        // Single mode: filter by the one configured community
+        // ---------------------------------------------------------------
+
+        const communityDid = env.COMMUNITY_DID ?? "did:plc:placeholder";
+
+        // Get category slugs matching allowed maturity levels
+        const allowedCategories = await db
+          .select({ slug: categories.slug })
+          .from(categories)
+          .where(
+            and(
+              eq(categories.communityDid, communityDid),
+              inArray(categories.maturityRating, allowed),
+            ),
+          );
+
+        const allowedSlugs = allowedCategories.map((c) => c.slug);
+
+        // If no categories are allowed, return empty result
+        if (allowedSlugs.length === 0) {
+          return reply.status(200).send({ topics: [], cursor: null });
+        }
+
+        // Filter topics to only those in allowed categories
+        conditions.push(inArray(topics.category, allowedSlugs));
       }
 
-      // Filter topics to only those in allowed categories
-      conditions.push(inArray(topics.category, allowedSlugs));
+      // Block/mute filtering: load the authenticated user's preferences
+      const { blockedDids, mutedDids } = await loadBlockMuteLists(request.user?.did, db);
+
+      // Exclude topics by blocked authors
+      if (blockedDids.length > 0) {
+        conditions.push(notInArray(topics.authorDid, blockedDids));
+      }
 
       // Category filter (explicit user filter, further narrows results)
       if (category) {
@@ -436,6 +501,13 @@ export function topicRoutes(): FastifyPluginCallback {
       const resultRows = hasMore ? rows.slice(0, limit) : rows;
       const serialized = resultRows.map(serializeTopic);
 
+      // Annotate muted authors (content is still returned, just flagged)
+      const mutedSet = new Set(mutedDids);
+      const annotatedTopics = serialized.map((t) => ({
+        ...t,
+        isMuted: mutedSet.has(t.authorDid),
+      }));
+
       let nextCursor: string | null = null;
       if (hasMore) {
         const lastRow = resultRows[resultRows.length - 1];
@@ -445,7 +517,7 @@ export function topicRoutes(): FastifyPluginCallback {
       }
 
       return reply.status(200).send({
-        topics: serialized,
+        topics: annotatedTopics,
         cursor: nextCursor,
       });
     });

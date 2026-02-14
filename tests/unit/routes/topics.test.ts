@@ -693,6 +693,93 @@ describe("topic routes", () => {
       expect(body.topics[0]?.labels).toEqual(labels);
       expect(body.topics[1]?.labels).toBeNull();
     });
+
+    it("excludes topics by blocked users from list", async () => {
+      const blockedDid = "did:plc:blockeduser";
+
+      // Query order for authenticated GET /api/topics:
+      // 1. User profile (maturity)
+      // 2. Allowed categories (maturity)
+      // 3. Block/mute preferences
+      // 4. Topics query (limit)
+      setupMaturityMocks(true);
+      // Block/mute preferences query
+      selectChain.where.mockResolvedValueOnce([{
+        blockedDids: [blockedDid],
+        mutedDids: [],
+      }]);
+
+      // Return only non-blocked topics (the route should have applied the filter)
+      const rows = [
+        sampleTopicRow({ authorDid: TEST_DID }),
+      ];
+      selectChain.limit.mockResolvedValueOnce(rows);
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/topics",
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json<{ topics: Array<{ authorDid: string; isMuted: boolean }> }>();
+      // The blocked user's topics should not appear at all
+      expect(body.topics.every((t) => t.authorDid !== blockedDid)).toBe(true);
+    });
+
+    it("annotates topics by muted users with isMuted: true", async () => {
+      const mutedDid = "did:plc:muteduser";
+
+      setupMaturityMocks(true);
+      // Block/mute preferences query
+      selectChain.where.mockResolvedValueOnce([{
+        blockedDids: [],
+        mutedDids: [mutedDid],
+      }]);
+
+      const rows = [
+        sampleTopicRow({ authorDid: mutedDid, uri: `at://${mutedDid}/forum.barazo.topic.post/m1`, rkey: "m1" }),
+        sampleTopicRow({ authorDid: TEST_DID }),
+      ];
+      selectChain.limit.mockResolvedValueOnce(rows);
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/topics",
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json<{ topics: Array<{ authorDid: string; isMuted: boolean }> }>();
+      expect(body.topics).toHaveLength(2);
+
+      const mutedTopic = body.topics.find((t) => t.authorDid === mutedDid);
+      const normalTopic = body.topics.find((t) => t.authorDid === TEST_DID);
+      expect(mutedTopic?.isMuted).toBe(true);
+      expect(normalTopic?.isMuted).toBe(false);
+    });
+
+    it("returns isMuted: false for all topics when unauthenticated", async () => {
+      const noAuthApp = await buildTestApp(undefined);
+      setupMaturityMocks(false); // no user profile query
+      // No block/mute preferences query for unauthenticated users
+
+      const rows = [
+        sampleTopicRow({ authorDid: TEST_DID }),
+        sampleTopicRow({ authorDid: OTHER_DID, uri: `at://${OTHER_DID}/forum.barazo.topic.post/o1`, rkey: "o1" }),
+      ];
+      selectChain.limit.mockResolvedValueOnce(rows);
+
+      const response = await noAuthApp.inject({
+        method: "GET",
+        url: "/api/topics",
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json<{ topics: Array<{ authorDid: string; isMuted: boolean }> }>();
+      expect(body.topics).toHaveLength(2);
+      expect(body.topics.every((t) => t.isMuted === false)).toBe(true);
+
+      await noAuthApp.close();
+    });
   });
 
   // =========================================================================
@@ -1150,6 +1237,279 @@ describe("topic routes", () => {
       });
 
       expect(response.statusCode).toBe(401);
+    });
+  });
+
+  // =========================================================================
+  // GET /api/topics (global mode)
+  // =========================================================================
+
+  describe("GET /api/topics (global mode)", () => {
+    const globalMockEnv = {
+      ...mockEnv,
+      COMMUNITY_MODE: "global" as const,
+      COMMUNITY_DID: undefined,
+    } as Env;
+
+    let app: FastifyInstance;
+
+    async function buildGlobalTestApp(user?: RequestUser): Promise<FastifyInstance> {
+      const globalApp = Fastify({ logger: false });
+
+      globalApp.decorate("db", mockDb as never);
+      globalApp.decorate("env", globalMockEnv);
+      globalApp.decorate("authMiddleware", createMockAuthMiddleware(user));
+      globalApp.decorate("firehose", mockFirehose as never);
+      globalApp.decorate("oauthClient", {} as never);
+      globalApp.decorate("sessionService", {} as SessionService);
+      globalApp.decorate("setupService", {} as SetupService);
+      globalApp.decorate("cache", {} as never);
+      globalApp.decorateRequest("user", undefined as RequestUser | undefined);
+
+      await globalApp.register(topicRoutes());
+      await globalApp.ready();
+
+      return globalApp;
+    }
+
+    /**
+     * Set up mock DB responses for global-mode GET /api/topics.
+     *
+     * Query order:
+     * 1. (if authenticated) User profile query -> selectChain.where
+     * 2. Community settings query -> selectChain.where (with isNotNull filter)
+     * 3. Category slugs query -> selectChain.where (categories by community + maturity)
+     * 4. (if authenticated) Block/mute preferences -> selectChain.where
+     * 5. Topics query -> selectChain.limit
+     */
+    function setupGlobalMaturityMocks(opts: {
+      authenticated: boolean;
+      userProfile?: { ageDeclaredAt: Date | null; maturityPref: string };
+      communities: Array<{ communityDid: string | null; maturityRating: string }>;
+      categorySlugs: string[];
+    }): void {
+      if (opts.authenticated) {
+        // User profile query
+        const profile = opts.userProfile ?? { ageDeclaredAt: null, maturityPref: "safe" };
+        selectChain.where.mockResolvedValueOnce([profile]);
+      }
+      // Community settings query (all communities)
+      selectChain.where.mockResolvedValueOnce(opts.communities);
+      // Category slugs query (filtered by allowed communities + maturity)
+      selectChain.where.mockResolvedValueOnce(
+        opts.categorySlugs.map((slug) => ({ slug })),
+      );
+    }
+
+    beforeAll(async () => {
+      app = await buildGlobalTestApp(testUser());
+    });
+
+    afterAll(async () => {
+      await app.close();
+    });
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+      resetAllDbMocks();
+    });
+
+    it("excludes topics from adult-rated communities in global mode", async () => {
+      setupGlobalMaturityMocks({
+        authenticated: true,
+        userProfile: { ageDeclaredAt: new Date(), maturityPref: "adult" },
+        communities: [
+          { communityDid: "did:plc:sfw-community", maturityRating: "safe" },
+          { communityDid: "did:plc:adult-community", maturityRating: "adult" },
+        ],
+        categorySlugs: ["general"],
+      });
+      // Topics query: return one topic from the SFW community
+      const rows = [
+        sampleTopicRow({ communityDid: "did:plc:sfw-community" }),
+      ];
+      selectChain.limit.mockResolvedValueOnce(rows);
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/topics",
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json<{ topics: Array<{ communityDid: string }> }>();
+      // Adult community topics should not be present
+      expect(body.topics.every((t) => t.communityDid !== "did:plc:adult-community")).toBe(true);
+      expect(body.topics).toHaveLength(1);
+    });
+
+    it("excludes mature-rated communities for SFW-only users", async () => {
+      setupGlobalMaturityMocks({
+        authenticated: true,
+        userProfile: { ageDeclaredAt: null, maturityPref: "safe" },
+        communities: [
+          { communityDid: "did:plc:sfw-community", maturityRating: "safe" },
+          { communityDid: "did:plc:mature-community", maturityRating: "mature" },
+        ],
+        categorySlugs: ["general"],
+      });
+      // Topics from SFW community only
+      const rows = [
+        sampleTopicRow({ communityDid: "did:plc:sfw-community" }),
+      ];
+      selectChain.limit.mockResolvedValueOnce(rows);
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/topics",
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json<{ topics: Array<{ communityDid: string }> }>();
+      expect(body.topics.every((t) => t.communityDid !== "did:plc:mature-community")).toBe(true);
+      expect(body.topics).toHaveLength(1);
+    });
+
+    it("includes mature-rated communities for users with mature preference", async () => {
+      setupGlobalMaturityMocks({
+        authenticated: true,
+        userProfile: { ageDeclaredAt: new Date(), maturityPref: "mature" },
+        communities: [
+          { communityDid: "did:plc:sfw-community", maturityRating: "safe" },
+          { communityDid: "did:plc:mature-community", maturityRating: "mature" },
+        ],
+        categorySlugs: ["general", "nsfw-general"],
+      });
+      // Topics from both allowed communities
+      const rows = [
+        sampleTopicRow({ communityDid: "did:plc:sfw-community" }),
+        sampleTopicRow({
+          communityDid: "did:plc:mature-community",
+          uri: `at://${TEST_DID}/forum.barazo.topic.post/mature1`,
+          rkey: "mature1",
+        }),
+      ];
+      selectChain.limit.mockResolvedValueOnce(rows);
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/topics",
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json<{ topics: Array<{ communityDid: string }> }>();
+      expect(body.topics).toHaveLength(2);
+      const communityDids = body.topics.map((t) => t.communityDid);
+      expect(communityDids).toContain("did:plc:sfw-community");
+      expect(communityDids).toContain("did:plc:mature-community");
+    });
+
+    it("always includes SFW communities in global mode", async () => {
+      const noAuthApp = await buildGlobalTestApp(undefined);
+
+      setupGlobalMaturityMocks({
+        authenticated: false,
+        communities: [
+          { communityDid: "did:plc:sfw1", maturityRating: "safe" },
+          { communityDid: "did:plc:sfw2", maturityRating: "safe" },
+          { communityDid: "did:plc:mature1", maturityRating: "mature" },
+        ],
+        categorySlugs: ["general", "support"],
+      });
+      const rows = [
+        sampleTopicRow({ communityDid: "did:plc:sfw1" }),
+        sampleTopicRow({
+          communityDid: "did:plc:sfw2",
+          uri: `at://${TEST_DID}/forum.barazo.topic.post/sfw2topic`,
+          rkey: "sfw2topic",
+        }),
+      ];
+      selectChain.limit.mockResolvedValueOnce(rows);
+
+      const response = await noAuthApp.inject({
+        method: "GET",
+        url: "/api/topics",
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json<{ topics: Array<{ communityDid: string }> }>();
+      expect(body.topics).toHaveLength(2);
+      const communityDids = body.topics.map((t) => t.communityDid);
+      expect(communityDids).toContain("did:plc:sfw1");
+      expect(communityDids).toContain("did:plc:sfw2");
+
+      await noAuthApp.close();
+    });
+
+    it("excludes adult communities even for users with adult maturity level", async () => {
+      setupGlobalMaturityMocks({
+        authenticated: true,
+        userProfile: { ageDeclaredAt: new Date(), maturityPref: "adult" },
+        communities: [
+          { communityDid: "did:plc:sfw-community", maturityRating: "safe" },
+          { communityDid: "did:plc:adult-community", maturityRating: "adult" },
+        ],
+        categorySlugs: ["general"],
+      });
+      const rows = [
+        sampleTopicRow({ communityDid: "did:plc:sfw-community" }),
+      ];
+      selectChain.limit.mockResolvedValueOnce(rows);
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/topics",
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json<{ topics: Array<{ communityDid: string }> }>();
+      // Even though user has adult maturity, adult communities are NEVER shown in global mode
+      expect(body.topics.every((t) => t.communityDid !== "did:plc:adult-community")).toBe(true);
+    });
+
+    it("returns empty result when no communities pass the filter", async () => {
+      // In global mode, when all communities are adult-rated, the handler
+      // should return early without even querying categories or topics.
+      // unauthenticated user: no user profile query
+      const noAuthApp = await buildGlobalTestApp(undefined);
+
+      // Community settings query: only adult community
+      selectChain.where.mockResolvedValueOnce([
+        { communityDid: "did:plc:adult-only", maturityRating: "adult" },
+      ]);
+      // No further mocks needed -- handler should return early
+
+      const response = await noAuthApp.inject({
+        method: "GET",
+        url: "/api/topics",
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json<{ topics: unknown[]; cursor: string | null }>();
+      expect(body.topics).toEqual([]);
+      expect(body.cursor).toBeNull();
+
+      await noAuthApp.close();
+    });
+
+    it("returns empty result when no categories pass the maturity filter in global mode", async () => {
+      setupGlobalMaturityMocks({
+        authenticated: true,
+        userProfile: { ageDeclaredAt: null, maturityPref: "safe" },
+        communities: [
+          { communityDid: "did:plc:sfw-community", maturityRating: "safe" },
+        ],
+        categorySlugs: [], // No categories pass the filter
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/topics",
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json<{ topics: unknown[]; cursor: string | null }>();
+      expect(body.topics).toEqual([]);
+      expect(body.cursor).toBeNull();
     });
   });
 });
