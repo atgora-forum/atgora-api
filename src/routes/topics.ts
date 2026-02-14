@@ -32,6 +32,18 @@ const topicJsonSchema = {
     contentFormat: { type: ["string", "null"] as const },
     category: { type: "string" as const },
     tags: { type: ["array", "null"] as const, items: { type: "string" as const } },
+    labels: {
+      type: ["object", "null"] as const,
+      properties: {
+        values: {
+          type: "array" as const,
+          items: {
+            type: "object" as const,
+            properties: { val: { type: "string" as const } },
+          },
+        },
+      },
+    },
     communityDid: { type: "string" as const },
     cid: { type: "string" as const },
     replyCount: { type: "integer" as const },
@@ -67,6 +79,7 @@ function serializeTopic(row: typeof topics.$inferSelect) {
     contentFormat: row.contentFormat ?? null,
     category: row.category,
     tags: row.tags ?? null,
+    labels: row.labels ?? null,
     communityDid: row.communityDid,
     cid: row.cid,
     replyCount: row.replyCount,
@@ -157,6 +170,19 @@ export function topicRoutes(): FastifyPluginCallback {
               items: { type: "string", minLength: 1, maxLength: 30 },
               maxItems: 5,
             },
+            labels: {
+              type: "object",
+              properties: {
+                values: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    required: ["val"],
+                    properties: { val: { type: "string" } },
+                  },
+                },
+              },
+            },
           },
         },
         response: {
@@ -188,7 +214,7 @@ export function topicRoutes(): FastifyPluginCallback {
         throw badRequest("Invalid topic data");
       }
 
-      const { title, content, category, tags } = parsed.data;
+      const { title, content, category, tags, labels } = parsed.data;
       const now = new Date().toISOString();
       const communityDid = env.COMMUNITY_DID ?? "did:plc:placeholder";
 
@@ -224,6 +250,7 @@ export function topicRoutes(): FastifyPluginCallback {
         tags: tags ?? [],
         community: communityDid,
         createdAt: now,
+        ...(labels ? { labels } : {}),
       };
 
       try {
@@ -249,6 +276,7 @@ export function topicRoutes(): FastifyPluginCallback {
             content,
             category,
             tags: tags ?? [],
+            labels: labels ?? null,
             communityDid,
             cid: result.cid,
             replyCount: 0,
@@ -264,6 +292,7 @@ export function topicRoutes(): FastifyPluginCallback {
               content,
               category,
               tags: tags ?? [],
+              labels: labels ?? null,
               cid: result.cid,
               indexedAt: new Date(),
             },

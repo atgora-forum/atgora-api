@@ -423,6 +423,57 @@ describe("topic routes", () => {
 
       expect(response.statusCode).toBe(502);
     });
+
+    it("creates a topic with self-labels and includes them in PDS record and DB insert", async () => {
+      const labels = { values: [{ val: "nsfw" }, { val: "spoiler" }] };
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/topics",
+        headers: { authorization: "Bearer test-token" },
+        payload: {
+          title: "Labeled Topic",
+          content: "This topic has self-labels.",
+          category: "general",
+          labels,
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+
+      // Verify PDS record includes labels
+      expect(createRecordFn).toHaveBeenCalledOnce();
+      const pdsRecord = createRecordFn.mock.calls[0]?.[2] as Record<string, unknown>;
+      expect(pdsRecord.labels).toEqual(labels);
+
+      // Verify DB insert includes labels
+      expect(mockDb.insert).toHaveBeenCalledOnce();
+      const insertValues = insertChain.values.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(insertValues.labels).toEqual(labels);
+    });
+
+    it("creates a topic without labels (backwards compatible)", async () => {
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/topics",
+        headers: { authorization: "Bearer test-token" },
+        payload: {
+          title: "No Labels Topic",
+          content: "This topic has no labels.",
+          category: "general",
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+
+      // Verify PDS record does NOT include labels key
+      const pdsRecord = createRecordFn.mock.calls[0]?.[2] as Record<string, unknown>;
+      expect(pdsRecord).not.toHaveProperty("labels");
+
+      // Verify DB insert has labels: null
+      const insertValues = insertChain.values.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(insertValues.labels).toBeNull();
+    });
   });
 
   describe("POST /api/topics (unauthenticated)", () => {
@@ -617,6 +668,31 @@ describe("topic routes", () => {
       expect(response.statusCode).toBe(200);
       await noAuthApp.close();
     });
+
+    it("includes labels in topic list response", async () => {
+      setupMaturityMocks(true);
+      const labels = { values: [{ val: "nsfw" }] };
+      const rows = [
+        sampleTopicRow({ labels }),
+        sampleTopicRow({
+          uri: `at://${TEST_DID}/forum.barazo.topic.post/nolabel`,
+          rkey: "nolabel",
+          labels: null,
+        }),
+      ];
+      selectChain.limit.mockResolvedValueOnce(rows);
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/api/topics",
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json<{ topics: Array<{ uri: string; labels: { values: Array<{ val: string }> } | null }> }>();
+      expect(body.topics).toHaveLength(2);
+      expect(body.topics[0]?.labels).toEqual(labels);
+      expect(body.topics[1]?.labels).toBeNull();
+    });
   });
 
   // =========================================================================
@@ -680,6 +756,37 @@ describe("topic routes", () => {
 
       expect(response.statusCode).toBe(200);
       await noAuthApp.close();
+    });
+
+    it("includes labels in single topic response", async () => {
+      const labels = { values: [{ val: "spoiler" }, { val: "nsfw" }] };
+      const row = sampleTopicRow({ labels });
+      selectChain.where.mockResolvedValueOnce([row]);
+
+      const encodedUri = encodeURIComponent(TEST_URI);
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/topics/${encodedUri}`,
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json<{ uri: string; labels: { values: Array<{ val: string }> } }>();
+      expect(body.labels).toEqual(labels);
+    });
+
+    it("returns null labels when topic has no labels", async () => {
+      const row = sampleTopicRow({ labels: null });
+      selectChain.where.mockResolvedValueOnce([row]);
+
+      const encodedUri = encodeURIComponent(TEST_URI);
+      const response = await app.inject({
+        method: "GET",
+        url: `/api/topics/${encodedUri}`,
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json<{ uri: string; labels: null }>();
+      expect(body.labels).toBeNull();
     });
   });
 
