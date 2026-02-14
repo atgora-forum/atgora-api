@@ -32,7 +32,8 @@ describe("replies schema", () => {
       "reactionCount",
       "createdAt",
       "indexedAt",
-      "embedding",
+      // Note: search_vector (tsvector) and embedding (vector) columns exist
+      // in the database but are managed outside Drizzle schema (migration 0010).
     ];
 
     for (const col of expected) {
@@ -56,7 +57,6 @@ describe("replies schema", () => {
   it("has nullable optional columns", () => {
     expect(columns.contentFormat.notNull).toBe(false);
     expect(columns.labels.notNull).toBe(false);
-    expect(columns.embedding.notNull).toBe(false);
   });
 
   it("has default value for reaction count", () => {

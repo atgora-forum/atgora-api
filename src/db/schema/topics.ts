@@ -34,7 +34,10 @@ export const topics = pgTable(
     isLocked: boolean("is_locked").notNull().default(false),
     isPinned: boolean("is_pinned").notNull().default(false),
     isModDeleted: boolean("is_mod_deleted").notNull().default(false),
-    embedding: text("embedding"),
+    // Note: search_vector (tsvector) and embedding (vector) columns exist in the
+    // database but are managed outside Drizzle schema (see migration 0010).
+    // search_vector is maintained by a database trigger.
+    // embedding is nullable vector(768) for optional semantic search.
   },
   (table) => [
     index("topics_author_did_idx").on(table.authorDid),
