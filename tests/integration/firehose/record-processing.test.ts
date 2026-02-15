@@ -11,7 +11,17 @@ import { ReplyIndexer } from "../../../src/firehose/indexers/reply.js";
 import { ReactionIndexer } from "../../../src/firehose/indexers/reaction.js";
 import { RecordHandler } from "../../../src/firehose/handlers/record.js";
 import type { RecordEvent } from "../../../src/firehose/types.js";
+import type { AccountAgeService } from "../../../src/services/account-age.js";
 import type postgres from "postgres";
+
+/** Stub that skips PLC resolution and always returns 'trusted'. */
+function createStubAccountAgeService(): AccountAgeService {
+  return {
+    // eslint-disable-next-line @typescript-eslint/require-await
+    resolveCreationDate: async () => null,
+    determineTrustStatus: () => "trusted",
+  };
+}
 
 const DATABASE_URL =
   process.env["DATABASE_URL"] ??
@@ -51,6 +61,7 @@ describe("firehose record processing (integration)", () => {
       { topic: topicIndexer, reply: replyIndexer, reaction: reactionIndexer },
       db,
       logger as never,
+      createStubAccountAgeService(),
     );
   });
 
