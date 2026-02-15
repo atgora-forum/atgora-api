@@ -349,7 +349,7 @@ export function moderationQueueRoutes(): FastifyPluginCallback {
             .from(communitySettings)
             .where(eq(communitySettings.id, "default"));
           const trustedPostThreshold =
-            settingsRows[0]?.moderationThresholds?.trustedPostThreshold ?? 10;
+            settingsRows[0]?.moderationThresholds.trustedPostThreshold ?? 10;
 
           if (existingTrust.length > 0) {
             const newCount =
@@ -436,7 +436,7 @@ export function moderationQueueRoutes(): FastifyPluginCallback {
         .from(communitySettings)
         .where(eq(communitySettings.id, "default"));
 
-      const words = (rows[0]?.wordFilter as string[] | undefined) ?? [];
+      const words = rows[0]?.wordFilter ?? [];
 
       return reply.status(200).send({ words });
     });

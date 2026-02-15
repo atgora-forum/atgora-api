@@ -247,7 +247,7 @@ export async function checkWriteRateLimit(
     }
 
     // Add current write
-    await cache.zadd(key, String(now), `${now}:${crypto.randomUUID()}`);
+    await cache.zadd(key, String(now), `${String(now)}:${crypto.randomUUID()}`);
     await cache.expire(key, 120); // TTL = 2 minutes
   } catch {
     // If Valkey is down, allow the write (fail open for rate limiting)
@@ -276,7 +276,7 @@ export async function checkBurstDetection(
       return true; // burst detected
     }
 
-    await cache.zadd(key, String(now), `${now}:${crypto.randomUUID()}`);
+    await cache.zadd(key, String(now), `${String(now)}:${crypto.randomUUID()}`);
     await cache.expire(key, settings.burstWindowMinutes * 60 + 60);
   } catch {
     return false;

@@ -41,6 +41,33 @@ function modUser(): RequestUser {
 }
 
 // ---------------------------------------------------------------------------
+// Response types
+// ---------------------------------------------------------------------------
+
+interface QueueItem {
+  id: number;
+  contentUri: string;
+  contentType: string;
+  authorDid: string;
+  communityDid: string;
+  queueReason: string;
+  matchedWords: string[] | null;
+  status: string;
+  reviewedBy: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+}
+
+interface QueueListResponse {
+  items: QueueItem[];
+  cursor: string | null;
+}
+
+interface WordFilterResponse {
+  words: string[];
+}
+
+// ---------------------------------------------------------------------------
 // Mock DB and cache
 // ---------------------------------------------------------------------------
 
@@ -62,8 +89,9 @@ function resetAllDbMocks(): void {
   mockDb.insert.mockReturnValue(insertChain);
   mockDb.select.mockReturnValue(selectChain);
   mockDb.update.mockReturnValue(updateChain);
-  mockDb.transaction.mockImplementation((fn: (tx: typeof mockDb) => Promise<void>) => {
-    return fn(mockDb);
+  // eslint-disable-next-line @typescript-eslint/no-misused-promises
+  mockDb.transaction.mockImplementation(async (fn: (tx: typeof mockDb) => Promise<void>) => {
+    await fn(mockDb);
   });
 }
 
@@ -101,10 +129,11 @@ async function buildTestApp(user?: RequestUser): Promise<FastifyInstance> {
   app.decorate("setupService", {} as SetupService);
   app.decorateRequest("user", undefined as RequestUser | undefined);
 
-  mockRequireModerator.mockImplementation(async (request: { user: RequestUser | undefined }) => {
+  mockRequireModerator.mockImplementation((request: { user: RequestUser | undefined }) => {
     if (user) {
       request.user = user;
     }
+    return Promise.resolve();
   });
 
   await app.register(moderationQueueRoutes());
@@ -131,8 +160,9 @@ describe("moderation queue routes", () => {
   beforeEach(() => {
     resetAllDbMocks();
     vi.clearAllMocks();
-    mockRequireModerator.mockImplementation(async (request: { user: RequestUser | undefined }) => {
+    mockRequireModerator.mockImplementation((request: { user: RequestUser | undefined }) => {
       request.user = modUser();
+      return Promise.resolve();
     });
   });
 
@@ -147,7 +177,7 @@ describe("moderation queue routes", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json();
+      const body = response.json<QueueListResponse>();
       expect(body.items).toEqual([]);
       expect(body.cursor).toBeNull();
     });
@@ -192,7 +222,7 @@ describe("moderation queue routes", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json();
+      const body = response.json<QueueListResponse>();
       expect(body.items).toHaveLength(2);
       expect(body.items[0].queueReason).toBe("word_filter");
       expect(body.items[0].matchedWords).toEqual(["spam"]);
@@ -249,7 +279,7 @@ describe("moderation queue routes", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json();
+      const body = response.json<QueueItem>();
       expect(body.status).toBe("approved");
       expect(body.reviewedBy).toBe(MOD_DID);
     });
@@ -306,7 +336,7 @@ describe("moderation queue routes", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json();
+      const body = response.json<WordFilterResponse>();
       expect(body.words).toEqual(["spam", "scam"]);
     });
 
@@ -320,7 +350,7 @@ describe("moderation queue routes", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json();
+      const body = response.json<WordFilterResponse>();
       expect(body.words).toEqual([]);
     });
   });
@@ -334,7 +364,7 @@ describe("moderation queue routes", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json();
+      const body = response.json<WordFilterResponse>();
       // Should be deduplicated and lowercased
       expect(body.words).toEqual(["spam", "scam", "fraud"]);
       expect(mockDb.update).toHaveBeenCalled();
