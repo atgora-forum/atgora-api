@@ -17,7 +17,7 @@ import type postgres from "postgres";
 /** Stub that skips PLC resolution and always returns 'trusted'. */
 function createStubAccountAgeService(): AccountAgeService {
   return {
-    resolveCreationDate: async () => null,
+    resolveCreationDate: () => Promise.resolve(null),
     determineTrustStatus: () => "trusted",
   };
 }
