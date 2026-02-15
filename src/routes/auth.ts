@@ -44,7 +44,7 @@ export function authRoutes(
   oauthClient: NodeOAuthClient,
 ): FastifyPluginCallback {
   return (app, _opts, done) => {
-    const { sessionService, env } = app;
+    const { sessionService, handleResolver, env } = app;
     const dev = isDevMode(env.OAUTH_CLIENT_ID);
     const sessionTtl = env.OAUTH_SESSION_TTL;
 
@@ -95,10 +95,9 @@ export function authRoutes(
         // Extract DID from the OAuth session
         const did = result.session.did;
 
-        // TODO(M3): Resolve handle from DID via AT Protocol identity layer.
-        // Currently uses DID as placeholder. Will be resolved when identity
-        // resolver is wired up (user profile caching from AT Protocol identity).
-        const handle = did;
+        // Resolve handle from DID via AT Protocol identity layer
+        // (PLC directory lookup with Valkey cache + DB fallback)
+        const handle = await handleResolver.resolve(did);
 
         const session = await sessionService.createSession(did, handle);
 

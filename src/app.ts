@@ -36,6 +36,8 @@ import { createRequireAdmin } from "./auth/require-admin.js";
 import { createSetupService } from "./setup/service.js";
 import type { SetupService } from "./setup/service.js";
 import { createPlcDidService } from "./services/plc-did.js";
+import { createHandleResolver } from "./lib/handle-resolver.js";
+import type { HandleResolver } from "./lib/handle-resolver.js";
 import type { Database } from "./db/index.js";
 import type { Cache } from "./cache/index.js";
 
@@ -50,6 +52,7 @@ declare module "fastify" {
     sessionService: SessionService;
     authMiddleware: AuthMiddleware;
     setupService: SetupService;
+    handleResolver: HandleResolver;
     requireAdmin: ReturnType<typeof createRequireAdmin>;
   }
 }
@@ -142,6 +145,10 @@ export async function buildApp(env: Env) {
   app.decorateRequest("user", undefined as RequestUser | undefined);
   const authMiddleware = createAuthMiddleware(sessionService, app.log);
   app.decorate("authMiddleware", authMiddleware);
+
+  // Handle resolver (DID -> handle, with cache)
+  const handleResolver = createHandleResolver(cache, db, app.log);
+  app.decorate("handleResolver", handleResolver);
 
   // PLC DID service + Setup service
   const plcDidService = createPlcDidService(app.log);
