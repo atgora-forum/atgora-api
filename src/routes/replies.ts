@@ -201,6 +201,7 @@ export function replyRoutes(): FastifyPluginCallback {
           },
           400: errorJsonSchema,
           401: errorJsonSchema,
+          403: errorJsonSchema,
           404: errorJsonSchema,
           502: errorJsonSchema,
         },

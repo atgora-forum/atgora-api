@@ -8,9 +8,9 @@ import {
   submitOnboardingSchema,
   validateFieldResponse,
 } from "../validation/onboarding.js";
-import type { OnboardingFieldType } from "../validation/onboarding.js";
+
 import { communityOnboardingFields, userOnboardingResponses } from "../db/schema/onboarding-fields.js";
-import { communitySettings } from "../db/schema/community-settings.js";
+
 
 // ---------------------------------------------------------------------------
 // OpenAPI JSON Schema definitions
@@ -506,7 +506,7 @@ export function onboardingRoutes(): FastifyPluginCallback {
         }
 
         const error = validateFieldResponse(
-          field.fieldType as OnboardingFieldType,
+          field.fieldType,
           submission.response,
           field.config,
         );

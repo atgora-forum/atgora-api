@@ -223,7 +223,7 @@ describe("onboarding admin routes", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json() as { id: string }[];
+      const body = response.json<{ id: string }[]>();
       expect(body).toHaveLength(2);
       expect(body[0]?.id).toBe("field-001");
       expect(body[1]?.id).toBe("field-002");
@@ -295,7 +295,7 @@ describe("onboarding admin routes", () => {
       });
 
       expect(response.statusCode).toBe(201);
-      const body = response.json() as { id: string; fieldType: string };
+      const body = response.json<{ id: string; fieldType: string }>();
       expect(body.id).toBe("field-001");
       expect(body.fieldType).toBe("custom_text");
     });
@@ -393,7 +393,7 @@ describe("onboarding admin routes", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json() as { label: string };
+      const body = response.json<{ label: string }>();
       expect(body.label).toBe("Updated label");
     });
 
@@ -525,7 +525,7 @@ describe("onboarding admin routes", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json() as { id: string }[];
+      const body = response.json<{ id: string }[]>();
       expect(body).toHaveLength(2);
     });
 
@@ -580,7 +580,7 @@ describe("onboarding user routes", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json() as { complete: boolean; fields: unknown[] };
+      const body = response.json<{ complete: boolean; fields: unknown[] }>();
       expect(body.complete).toBe(true);
       expect(body.fields).toEqual([]);
     });
@@ -596,7 +596,7 @@ describe("onboarding user routes", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json() as { complete: boolean; fields: { completed: boolean }[] };
+      const body = response.json<{ complete: boolean; fields: { completed: boolean }[] }>();
       expect(body.complete).toBe(false);
       expect(body.fields[0]?.completed).toBe(false);
     });
@@ -612,7 +612,7 @@ describe("onboarding user routes", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json() as { complete: boolean; fields: { completed: boolean }[] };
+      const body = response.json<{ complete: boolean; fields: { completed: boolean }[] }>();
       expect(body.complete).toBe(true);
       expect(body.fields[0]?.completed).toBe(true);
     });
@@ -634,7 +634,7 @@ describe("onboarding user routes", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json() as { complete: boolean };
+      const body = response.json<{ complete: boolean }>();
       expect(body.complete).toBe(true);
     });
 
@@ -693,7 +693,7 @@ describe("onboarding user routes", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json() as { success: boolean; complete: boolean };
+      const body = response.json<{ success: boolean; complete: boolean }>();
       expect(body.success).toBe(true);
       expect(body.complete).toBe(true);
     });

@@ -19,11 +19,6 @@ export type OnboardingFieldType = z.infer<typeof onboardingFieldTypeSchema>;
 // Config schemas per field type
 // ---------------------------------------------------------------------------
 
-const tosConfigSchema = z.object({
-  tosUrl: z.string().url().optional(),
-  tosText: z.string().max(2000).optional(),
-});
-
 const selectConfigSchema = z.object({
   options: z.array(z.string().min(1).max(200)).min(2).max(20),
 });
@@ -102,7 +97,7 @@ export function validateFieldResponse(
     case "newsletter_email": {
       if (typeof response !== "string") return "Email must be a string";
       if (response.length === 0) return null; // optional empty is fine
-      const emailResult = z.string().email().safeParse(response);
+      const emailResult = z.email().safeParse(response);
       if (!emailResult.success) return "Invalid email format";
       return null;
     }

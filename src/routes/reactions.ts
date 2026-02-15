@@ -154,6 +154,7 @@ export function reactionRoutes(): FastifyPluginCallback {
           },
           400: errorJsonSchema,
           401: errorJsonSchema,
+          403: errorJsonSchema,
           404: errorJsonSchema,
           409: errorJsonSchema,
           502: errorJsonSchema,

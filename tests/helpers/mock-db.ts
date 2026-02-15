@@ -68,8 +68,11 @@ export function createChainableProxy(terminalResult: unknown = []): DbChain {
 
   // Terminal methods return thenables so `await db.insert().values().returning()` works
   // and `await db.select().from().where().orderBy()` works
+  // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Intentionally thenable mock for Drizzle chain
   chain.orderBy.mockImplementation(() => makeThenable());
+  // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Intentionally thenable mock for Drizzle chain
   chain.limit.mockImplementation(() => makeThenable());
+  // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Intentionally thenable mock for Drizzle chain
   chain.returning.mockImplementation(() => makeThenable());
 
   // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Intentionally thenable mock for Drizzle chain
