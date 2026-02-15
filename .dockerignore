@@ -1,0 +1,14 @@
+node_modules
+dist
+.git
+.gitignore
+tests
+coverage
+.env
+.env.*
+*.md
+LICENSE
+vitest.config.ts
+vitest.config.integration.ts
+eslint.config.js
+tsconfig.eslint.json
