@@ -90,8 +90,9 @@ describe("OzoneService", () => {
   describe("start / stop", () => {
     it("sets stopping to false on start and creates a WebSocket", () => {
       // start() should not throw and should attempt to connect
-      expect(() => service.start()).not.toThrow();
+      expect(() => { service.start(); }).not.toThrow();
       expect(logger.info).toHaveBeenCalledWith(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         expect.objectContaining({ url: expect.stringContaining("wss:") }),
         "Connecting to Ozone labeler",
       );

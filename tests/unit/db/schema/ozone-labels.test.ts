@@ -53,7 +53,7 @@ describe("ozone-labels schema", () => {
       (idx) => idx.config.name === "ozone_labels_src_uri_val_idx",
     );
     expect(uniqueIdx).toBeDefined();
-    expect(uniqueIdx!.config.unique).toBe(true);
+    expect(uniqueIdx?.config.unique).toBe(true);
   });
 
   it("should have default timestamp for indexedAt", () => {

@@ -74,7 +74,7 @@ describe("account-filters schema", () => {
       (idx) => idx.config.name === "account_filters_did_community_idx",
     );
     expect(uniqueIdx).toBeDefined();
-    expect(uniqueIdx!.config.unique).toBe(true);
+    expect(uniqueIdx?.config.unique).toBe(true);
   });
 
   it("should have default timestamps for createdAt and updatedAt", () => {
