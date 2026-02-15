@@ -5,6 +5,7 @@ import type { FastifyInstance } from "fastify";
 import type { SessionService, SessionWithToken, Session } from "../../../src/auth/session.js";
 import type { Env } from "../../../src/config/env.js";
 import { authRoutes } from "../../../src/routes/auth.js";
+import type { HandleResolver } from "../../../src/lib/handle-resolver.js";
 
 // ---------------------------------------------------------------------------
 // Mock env (minimal subset needed by auth routes)
@@ -31,6 +32,9 @@ const refreshSessionFn = vi.fn<(...args: unknown[]) => Promise<SessionWithToken 
 const deleteSessionFn = vi.fn<(...args: unknown[]) => Promise<void>>();
 const deleteAllSessionsForDidFn = vi.fn<(...args: unknown[]) => Promise<number>>();
 
+// Handle resolver mock function
+const resolveFn = vi.fn<(...args: unknown[]) => Promise<string>>();
+
 // ---------------------------------------------------------------------------
 // Mock objects using standalone fns
 // ---------------------------------------------------------------------------
@@ -48,6 +52,10 @@ const mockSessionService: SessionService = {
   refreshSession: refreshSessionFn,
   deleteSession: deleteSessionFn,
   deleteAllSessionsForDid: deleteAllSessionsForDidFn,
+};
+
+const mockHandleResolver: HandleResolver = {
+  resolve: resolveFn,
 };
 
 // ---------------------------------------------------------------------------
@@ -100,6 +108,7 @@ describe("auth routes", () => {
     // Decorate with mocks
     app.decorate("env", mockEnv);
     app.decorate("sessionService", mockSessionService);
+    app.decorate("handleResolver", mockHandleResolver);
 
     // Register auth routes (cast needed because mock is not full NodeOAuthClient)
     await app.register(
@@ -199,6 +208,7 @@ describe("auth routes", () => {
         session: mockOAuthSession,
         state: "some-state",
       });
+      resolveFn.mockResolvedValueOnce(TEST_HANDLE);
       createSessionFn.mockResolvedValueOnce(mockSession);
 
       const response = await app.inject({
@@ -219,8 +229,9 @@ describe("auth routes", () => {
       expect(body.did).toBe(TEST_DID);
       expect(body.handle).toBe(TEST_HANDLE);
 
-      // Verify session created with DID as handle placeholder (TODO(M3): resolve handle)
-      expect(createSessionFn).toHaveBeenCalledWith(TEST_DID, TEST_DID);
+      // Verify handle was resolved from DID and session created with resolved handle
+      expect(resolveFn).toHaveBeenCalledWith(TEST_DID);
+      expect(createSessionFn).toHaveBeenCalledWith(TEST_DID, TEST_HANDLE);
 
       // Verify cookie was set
       const cookies = response.cookies;
@@ -524,6 +535,7 @@ describe("auth routes (production mode)", () => {
     await prodApp.register(cookie, { secret: "a".repeat(32) });
     prodApp.decorate("env", prodEnv);
     prodApp.decorate("sessionService", mockSessionService);
+    prodApp.decorate("handleResolver", mockHandleResolver);
     await prodApp.register(
       authRoutes(mockOAuthClient as Parameters<typeof authRoutes>[0]),
     );
@@ -546,6 +558,7 @@ describe("auth routes (production mode)", () => {
       session: mockOAuthSession,
       state: "some-state",
     });
+    resolveFn.mockResolvedValueOnce(TEST_HANDLE);
     createSessionFn.mockResolvedValueOnce(mockSession);
 
     const response = await prodApp.inject({
