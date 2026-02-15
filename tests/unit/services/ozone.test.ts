@@ -108,7 +108,7 @@ describe("OzoneService", () => {
     });
 
     it("stop is safe to call without prior start", () => {
-      expect(() => service.stop()).not.toThrow();
+      expect(() => { service.stop(); }).not.toThrow();
     });
 
     it("does not reconnect after stop", () => {
@@ -117,6 +117,7 @@ describe("OzoneService", () => {
       // After stopping, a second start should work fresh
       service.start();
       expect(logger.info).toHaveBeenCalledWith(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         expect.objectContaining({ url: expect.any(String) }),
         "Connecting to Ozone labeler",
       );
@@ -307,7 +308,7 @@ describe("OzoneService", () => {
       };
 
       // Access private method for testing
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await (service as any).processLabel(label);
 
       expect(db.delete).toHaveBeenCalled();
@@ -327,7 +328,7 @@ describe("OzoneService", () => {
         cts: "2026-01-15T12:00:00.000Z",
       };
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await (service as any).processLabel(label);
 
       expect(db.insert).toHaveBeenCalled();
@@ -357,7 +358,7 @@ describe("OzoneService", () => {
         exp: "2026-02-15T12:00:00.000Z",
       };
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await (service as any).processLabel(label);
 
       expect(db._insertValues).toHaveBeenCalledWith(
@@ -376,7 +377,7 @@ describe("OzoneService", () => {
         cts: "2026-01-15T12:00:00.000Z",
       };
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await (service as any).processLabel(label);
 
       expect(db._insertValues).toHaveBeenCalledWith(
@@ -398,7 +399,7 @@ describe("OzoneService", () => {
       };
 
       // Should not throw despite cache failure
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await expect((service as any).processLabel(label)).resolves.not.toThrow();
       expect(db.insert).toHaveBeenCalled();
     });
@@ -424,7 +425,7 @@ describe("OzoneService", () => {
         ],
       });
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await (service as any).handleMessage(event);
 
       // First label: insert (neg: false)
@@ -438,7 +439,7 @@ describe("OzoneService", () => {
     it("handleMessage skips events without labels array", async () => {
       const event = JSON.stringify({ seq: 1 });
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await (service as any).handleMessage(event);
 
       expect(db.insert).not.toHaveBeenCalled();
@@ -446,10 +447,11 @@ describe("OzoneService", () => {
     });
 
     it("handleMessage logs warning on invalid JSON", async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await (service as any).handleMessage("not valid json{{{");
 
       expect(logger.warn).toHaveBeenCalledWith(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         expect.objectContaining({ err: expect.any(SyntaxError) }),
         "Failed to process Ozone label event",
       );
@@ -470,7 +472,7 @@ describe("OzoneService", () => {
       };
 
       // Pass a non-string -- String(object) produces "[object Object]" which is invalid JSON
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       await (service as any).handleMessage(event);
 
       // Should log a warning because String({}) is not valid JSON
