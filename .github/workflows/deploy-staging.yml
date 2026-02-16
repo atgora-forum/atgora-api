@@ -1,0 +1,24 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  trigger-deploy:
+    name: Trigger Staging Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch to barazo-deploy
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.DEPLOY_PAT }}
+          repository: barazo-forum/barazo-deploy
+          event-type: deploy-staging
+          client-payload: |
+            {
+              "trigger_repo": "barazo-api",
+              "api_ref": "${{ github.sha }}",
+              "web_ref": "main"
+            }
