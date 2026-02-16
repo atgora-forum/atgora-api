@@ -87,6 +87,9 @@ export function authRoutes(
 
       const { iss, code, state } = parsed.data;
 
+      // Determine the frontend origin for redirect
+      const frontendOrigin = env.CORS_ORIGINS.split(",")[0]?.trim() || "http://localhost:3000";
+
       try {
         // Build URLSearchParams for the OAuth client callback
         const callbackParams = new URLSearchParams({ iss, code, state });
@@ -101,24 +104,27 @@ export function authRoutes(
 
         const session = await sessionService.createSession(did, handle);
 
-        // Set refresh cookie
+        // Set refresh cookie (sameSite lax to survive cross-site redirect from PDS)
         void reply.setCookie(COOKIE_NAME, session.sid, {
           httpOnly: true,
           secure: !dev,
-          sameSite: "strict",
+          sameSite: "lax",
           path: COOKIE_PATH,
           maxAge: sessionTtl,
         });
 
-        return await reply.status(200).send({
-          accessToken: session.accessToken,
-          expiresAt: session.accessTokenExpiresAt,
-          did,
-          handle: session.handle,
-        });
+        // Redirect to frontend -- no tokens in URL, frontend uses cookie to refresh
+        const redirectUrl = new URL("/auth/callback", frontendOrigin);
+        redirectUrl.searchParams.set("success", "true");
+
+        return await reply.redirect(redirectUrl.toString(), 302);
       } catch (err: unknown) {
         app.log.error({ err }, "OAuth callback failed");
-        return await reply.status(502).send({ error: "OAuth callback failed" });
+
+        // Redirect to frontend with error
+        const errorUrl = new URL("/auth/callback", frontendOrigin);
+        errorUrl.searchParams.set("error", "OAuth callback failed");
+        return await reply.redirect(errorUrl.toString(), 302);
       }
     });
 
@@ -144,7 +150,7 @@ export function authRoutes(
         void reply.setCookie(COOKIE_NAME, session.sid, {
           httpOnly: true,
           secure: !dev,
-          sameSite: "strict",
+          sameSite: "lax",
           path: COOKIE_PATH,
           maxAge: sessionTtl,
         });
@@ -152,6 +158,8 @@ export function authRoutes(
         return await reply.status(200).send({
           accessToken: session.accessToken,
           expiresAt: session.accessTokenExpiresAt,
+          did: session.did,
+          handle: session.handle,
         });
       } catch (err: unknown) {
         app.log.error({ err }, "Session refresh failed");
