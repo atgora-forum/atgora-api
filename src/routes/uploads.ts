@@ -94,7 +94,7 @@ export function uploadRoutes(): FastifyPluginCallback {
         const buffer = await file.toBuffer();
         if (buffer.length > maxSize) {
           throw badRequest(
-            `File too large (max ${Math.round(maxSize / 1024 / 1024)}MB)`,
+            `File too large (max ${String(Math.round(maxSize / 1024 / 1024))}MB)`,
           );
         }
 
@@ -163,7 +163,7 @@ export function uploadRoutes(): FastifyPluginCallback {
         const buffer = await file.toBuffer();
         if (buffer.length > maxSize) {
           throw badRequest(
-            `File too large (max ${Math.round(maxSize / 1024 / 1024)}MB)`,
+            `File too large (max ${String(Math.round(maxSize / 1024 / 1024))}MB)`,
           );
         }
 

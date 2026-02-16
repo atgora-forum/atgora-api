@@ -171,7 +171,7 @@ function createMultipartPayload(
   mimetype: string,
   data: Buffer,
 ): { body: string; contentType: string } {
-  const boundary = "----TestBoundary" + Date.now();
+  const boundary = `----TestBoundary${String(Date.now())}`;
   const body = [
     `--${boundary}`,
     `Content-Disposition: form-data; name="file"; filename="${filename}"`,
@@ -240,6 +240,7 @@ describe("upload routes", () => {
       expect(result.url).toBe(
         "http://localhost:3000/uploads/avatars/test.webp",
       );
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(mockStorage.store).toHaveBeenCalledOnce();
       expect(mockDb.insert).toHaveBeenCalledOnce();
     });
@@ -407,6 +408,7 @@ describe("upload routes", () => {
       expect(result.url).toBe(
         "http://localhost:3000/uploads/banners/test.webp",
       );
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(mockStorage.store).toHaveBeenCalledOnce();
       expect(mockDb.insert).toHaveBeenCalledOnce();
     });

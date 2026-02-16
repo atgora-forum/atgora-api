@@ -203,7 +203,7 @@ export function profileRoutes(): FastifyPluginCallback {
       },
       async (request, reply) => {
         const { handle } = request.params as { handle: string };
-        const { communityDid } = (request.query as { communityDid?: string }) ?? {};
+        const { communityDid } = request.query as { communityDid?: string };
 
         // Look up user by handle
         const userRows = await db

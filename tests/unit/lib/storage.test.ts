@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { existsSync } from "node:fs";
-import { readFile, rm, mkdtemp, writeFile } from "node:fs/promises";
+import { readFile, rm, mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createLocalStorage } from "../../../src/lib/storage.js";
@@ -52,7 +52,7 @@ describe("createLocalStorage", () => {
     // Verify the file was actually written
     const relativePath = url.split("/uploads/")[1];
     expect(relativePath).toBeDefined();
-    const filepath = join(tmpDir, relativePath!);
+    const filepath = join(tmpDir, relativePath ?? "");
     const written = await readFile(filepath);
     expect(written.toString()).toBe("fake-image-data");
   });
@@ -110,7 +110,7 @@ describe("createLocalStorage", () => {
     const url = await storage.store(data, "image/webp", "avatars");
 
     // File exists before delete
-    const relativePath = url.split("/uploads/")[1]!;
+    const relativePath = url.split("/uploads/")[1] ?? "";
     const filepath = join(tmpDir, relativePath);
     expect(existsSync(filepath)).toBe(true);
 
