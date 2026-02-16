@@ -42,6 +42,8 @@ import type { SetupService } from "./setup/service.js";
 import { createPlcDidService } from "./services/plc-did.js";
 import { createHandleResolver } from "./lib/handle-resolver.js";
 import type { HandleResolver } from "./lib/handle-resolver.js";
+import { createProfileSyncService } from "./services/profile-sync.js";
+import type { ProfileSyncService } from "./services/profile-sync.js";
 import type { Database } from "./db/index.js";
 import type { Cache } from "./cache/index.js";
 
@@ -60,6 +62,7 @@ declare module "fastify" {
     requireAdmin: ReturnType<typeof createRequireAdmin>;
     requireOperator: ReturnType<typeof createRequireOperator>;
     ozoneService: OzoneService | null;
+    profileSync: ProfileSyncService;
   }
 }
 
@@ -156,6 +159,10 @@ export async function buildApp(env: Env) {
   // Handle resolver (DID -> handle, with cache)
   const handleResolver = createHandleResolver(cache, db, app.log);
   app.decorate("handleResolver", handleResolver);
+
+  // Profile sync (fetches AT Protocol profile from PDS at login)
+  const profileSync = createProfileSyncService(oauthClient, db, app.log);
+  app.decorate("profileSync", profileSync);
 
   // PLC DID service + Setup service
   const plcDidService = createPlcDidService(app.log);
