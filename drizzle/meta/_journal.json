@@ -127,6 +127,27 @@
       "when": 1771151983300,
       "tag": "0017_empty_leper_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1771195295640,
+      "tag": "0018_shocking_pet_avengers",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1771197644627,
+      "tag": "0019_account_age_trust",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1771197672050,
+      "tag": "0020_colorful_night_thrasher",
+      "breakpoints": true
     }
   ]
 }
