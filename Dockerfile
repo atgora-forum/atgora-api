@@ -45,7 +45,7 @@ RUN pnpm --filter @barazo-forum/lexicons build && \
 
 # Create standalone production deployment with resolved dependencies.
 # pnpm deploy resolves catalog: entries and copies only prod deps.
-RUN pnpm --filter barazo-api deploy /app/deploy --prod
+RUN pnpm --filter barazo-api deploy /app/deploy --prod --legacy
 
 # ---------------------------------------------------------------------------
 # Stage 3: Production runner
