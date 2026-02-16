@@ -43,15 +43,9 @@ COPY barazo-api/ ./barazo-api/
 RUN pnpm --filter @barazo-forum/lexicons build && \
     pnpm --filter barazo-api build
 
-# Create standalone production deployment:
-# Pack lexicons as tarball, then install API prod deps with npm
-RUN cd /workspace/barazo-lexicons && pnpm pack --pack-destination /tmp && \
-    mkdir -p /app/deploy && \
-    cp /workspace/barazo-api/package.json /app/deploy/ && \
-    cd /app/deploy && \
-    npm install --omit=dev --install-links \
-      $(ls /tmp/barazo-forum-lexicons-*.tgz) && \
-    rm -rf /root/.npm
+# Create standalone production deployment with resolved dependencies.
+# pnpm deploy resolves catalog: entries and copies only prod deps.
+RUN pnpm --filter barazo-api deploy /app/deploy --prod
 
 # ---------------------------------------------------------------------------
 # Stage 3: Production runner
