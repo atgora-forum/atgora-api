@@ -1,4 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
+import type { Database } from "../db/index.js";
 import { users } from "../db/schema/users.js";
 import { communityProfiles } from "../db/schema/community-profiles.js";
 import {
@@ -29,8 +30,7 @@ export interface AuthorProfile {
 export async function resolveAuthors(
   dids: string[],
   communityDid: string | null,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Drizzle db type is complex; callers pass the real db instance
-  db: any,
+  db: Database,
 ): Promise<Map<string, AuthorProfile>> {
   const uniqueDids = [...new Set(dids)];
   if (uniqueDids.length === 0) {
