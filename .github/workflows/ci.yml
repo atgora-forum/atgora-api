@@ -130,4 +130,16 @@ jobs:
       - run: pnpm install
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: pnpm audit --audit-level=high
+      - name: Security audit with retry
+        run: |
+          for attempt in 1 2 3; do
+            output=$(pnpm audit --audit-level=high 2>&1) && { echo "$output"; exit 0; }
+            if echo "$output" | grep -q "ERR_PNPM_AUDIT_BAD_RESPONSE\|ECONNREFUSED\|ETIMEDOUT\|EAI_AGAIN"; then
+              echo "::warning::Audit registry unavailable (attempt $attempt/3), retrying in 15s..."
+              sleep 15
+            else
+              echo "$output"
+              exit 1
+            fi
+          done
+          echo "::warning::Audit registry unavailable after 3 attempts, skipping"
