@@ -16,11 +16,11 @@
  */
 export function computeClusterDiversityFactor(
   inFlaggedCluster: boolean,
-  externalInteractionCount: number,
+  externalInteractionCount: number
 ): number {
   if (!inFlaggedCluster) {
-    return 1.0;
+    return 1.0
   }
 
-  return Math.log2(1 + externalInteractionCount);
+  return Math.log2(1 + externalInteractionCount)
 }
