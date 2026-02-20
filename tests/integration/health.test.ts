@@ -32,6 +32,7 @@ describe('health routes (integration)', () => {
       LOG_LEVEL: 'silent',
       CORS_ORIGINS: 'http://localhost:3001',
       COMMUNITY_MODE: 'single' as const,
+      COMMUNITY_DID: 'did:plc:testcommunity',
       COMMUNITY_NAME: 'Test Community',
       RATE_LIMIT_AUTH: 10,
       RATE_LIMIT_WRITE: 10,

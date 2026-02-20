@@ -1,10 +1,11 @@
 import { eq } from 'drizzle-orm'
 import { users } from '../../db/schema/users.js'
+import { replies } from '../../db/schema/replies.js'
+import { reactions } from '../../db/schema/reactions.js'
 import type { Database } from '../../db/index.js'
 import type { Logger } from '../../lib/logger.js'
 import type { RecordEvent } from '../types.js'
-import { COLLECTION_MAP, SUPPORTED_COLLECTIONS } from '../types.js'
-import type { SupportedCollection } from '../types.js'
+import { COLLECTION_MAP, isSupportedCollection } from '../types.js'
 import { validateRecord } from '../validation.js'
 import type { TopicIndexer } from '../indexers/topic.js'
 import type { ReplyIndexer } from '../indexers/reply.js'
@@ -15,10 +16,6 @@ interface Indexers {
   topic: TopicIndexer
   reply: ReplyIndexer
   reaction: ReactionIndexer
-}
-
-function isSupportedCollection(collection: string): collection is SupportedCollection {
-  return (SUPPORTED_COLLECTIONS as readonly string[]).includes(collection)
 }
 
 export class RecordHandler {
@@ -154,25 +151,53 @@ export class RecordHandler {
           did: params.did,
         })
         break
-      case 'reply':
-        // For reply delete, we need the root URI to decrement the count.
-        // If the record is available (backfill), use it. Otherwise, the
-        // integration will handle the count via the stored rootUri.
+      case 'reply': {
+        // AT Protocol delete events don't include record data, so look up
+        // the rootUri from the DB before the indexer hard-deletes the row.
+        const replyRows = await this.db
+          .select({ rootUri: replies.rootUri })
+          .from(replies)
+          .where(eq(replies.uri, params.uri))
+
+        const rootUri = replyRows[0]?.rootUri ?? ''
+        if (!rootUri) {
+          this.logger.debug(
+            { uri: params.uri },
+            'Reply not found in DB for delete, count decrement will be skipped'
+          )
+        }
+
         await this.indexers.reply.handleDelete({
           uri: params.uri,
           rkey: params.rkey,
           did: params.did,
-          rootUri: '',
+          rootUri,
         })
         break
-      case 'reaction':
+      }
+      case 'reaction': {
+        // Same pattern: look up subjectUri before the row is deleted.
+        const reactionRows = await this.db
+          .select({ subjectUri: reactions.subjectUri })
+          .from(reactions)
+          .where(eq(reactions.uri, params.uri))
+
+        const subjectUri = reactionRows[0]?.subjectUri ?? ''
+        if (!subjectUri) {
+          this.logger.debug(
+            { uri: params.uri },
+            'Reaction not found in DB for delete, count decrement will be skipped'
+          )
+        }
+
         await this.indexers.reaction.handleDelete({
           uri: params.uri,
           rkey: params.rkey,
           did: params.did,
-          subjectUri: '',
+          subjectUri,
         })
         break
+      }
     }
   }
 

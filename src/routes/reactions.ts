@@ -1,5 +1,6 @@
 import { eq, and, sql, asc } from 'drizzle-orm'
 import type { FastifyPluginCallback } from 'fastify'
+import { getCommunityDid } from '../config/env.js'
 import { createPdsClient } from '../lib/pds-client.js'
 import { notFound, forbidden, badRequest, conflict } from '../lib/api-errors.js'
 import { createReactionSchema, reactionQuerySchema } from '../validation/reactions.js'
@@ -9,6 +10,7 @@ import { replies } from '../db/schema/replies.js'
 import { communitySettings } from '../db/schema/community-settings.js'
 import { checkOnboardingComplete } from '../lib/onboarding-gate.js'
 import { createNotificationService } from '../services/notification.js'
+import { extractRkey } from '../lib/at-uri.js'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -85,19 +87,6 @@ function decodeCursor(cursor: string): { createdAt: string; uri: string } | null
   } catch {
     return null
   }
-}
-
-/**
- * Extract the rkey from an AT URI.
- * Format: at://did:plc:xxx/collection/rkey
- */
-function extractRkey(uri: string): string {
-  const parts = uri.split('/')
-  const rkey = parts[parts.length - 1]
-  if (!rkey) {
-    throw badRequest('Invalid AT URI: missing rkey')
-  }
-  return rkey
 }
 
 /**
@@ -180,7 +169,7 @@ export function reactionRoutes(): FastifyPluginCallback {
         }
 
         const { subjectUri, subjectCid, type: reactionType } = parsed.data
-        const communityDid = env.COMMUNITY_DID ?? 'did:plc:placeholder'
+        const communityDid = getCommunityDid(env)
 
         // Onboarding gate: block if user hasn't completed mandatory onboarding
         const onboarding = await checkOnboardingComplete(db, user.did, communityDid)
@@ -372,7 +361,7 @@ export function reactionRoutes(): FastifyPluginCallback {
 
         const { uri } = request.params as { uri: string }
         const decodedUri = decodeURIComponent(uri)
-        const communityDid = env.COMMUNITY_DID ?? 'did:plc:placeholder'
+        const communityDid = getCommunityDid(env)
 
         // Fetch existing reaction (scoped to this community)
         const existing = await db
@@ -472,7 +461,7 @@ export function reactionRoutes(): FastifyPluginCallback {
         }
 
         const { subjectUri, type: reactionType, cursor, limit } = parsed.data
-        const communityDid = env.COMMUNITY_DID ?? 'did:plc:placeholder'
+        const communityDid = getCommunityDid(env)
         const conditions = [
           eq(reactions.subjectUri, subjectUri),
           eq(reactions.communityDid, communityDid),

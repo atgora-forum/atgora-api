@@ -6,6 +6,7 @@ import type { NotificationService } from './notification.js'
 import { generateOgImage } from './og-image.js'
 import { crossPosts } from '../db/schema/cross-posts.js'
 import { userPreferences } from '../db/schema/user-preferences.js'
+import { extractRkey } from '../lib/at-uri.js'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -51,15 +52,6 @@ export interface CrossPostConfig {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Extract the rkey from an AT URI.
- * Format: at://did:plc:xxx/collection/rkey
- */
-function extractRkey(uri: string): string {
-  const parts = uri.split('/')
-  return parts[parts.length - 1] ?? ''
-}
 
 /**
  * Truncate text to a maximum number of characters, appending ellipsis if needed.

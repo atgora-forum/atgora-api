@@ -3,6 +3,7 @@ import { topics } from '../../db/schema/topics.js'
 import type { Database } from '../../db/index.js'
 import type { Logger } from '../../lib/logger.js'
 import type { TrustStatus } from '../../services/account-age.js'
+import { clampCreatedAt } from '../clamp-timestamp.js'
 
 interface CreateParams {
   uri: string
@@ -27,7 +28,9 @@ export class TopicIndexer {
   ) {}
 
   async handleCreate(params: CreateParams): Promise<void> {
-    const { uri, rkey, did, cid, record, trustStatus } = params
+    const { uri, rkey, did, cid, record, live, trustStatus } = params
+    const clientCreatedAt = new Date(record['createdAt'] as string)
+    const createdAt = live ? clampCreatedAt(clientCreatedAt) : clientCreatedAt
 
     await this.db
       .insert(topics)
@@ -43,8 +46,8 @@ export class TopicIndexer {
         communityDid: record['community'] as string,
         cid,
         labels: (record['labels'] as { values: { val: string }[] } | undefined) ?? null,
-        createdAt: new Date(record['createdAt'] as string),
-        lastActivityAt: new Date(record['createdAt'] as string),
+        createdAt,
+        lastActivityAt: createdAt,
         trustStatus,
       })
       .onConflictDoUpdate({
@@ -87,8 +90,8 @@ export class TopicIndexer {
   async handleDelete(params: DeleteParams): Promise<void> {
     const { uri } = params
 
-    await this.db.delete(topics).where(eq(topics.uri, uri))
+    await this.db.update(topics).set({ isAuthorDeleted: true }).where(eq(topics.uri, uri))
 
-    this.logger.debug({ uri }, 'Deleted topic')
+    this.logger.debug({ uri }, 'Soft-deleted topic (author delete)')
   }
 }

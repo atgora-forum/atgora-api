@@ -1214,8 +1214,10 @@ describe('topic routes', () => {
       expect(deleteRecordFn).toHaveBeenCalledOnce()
       expect(deleteRecordFn.mock.calls[0]?.[0]).toBe(TEST_DID)
 
-      // Should have deleted from DB (replies + topics)
-      expect(mockDb.delete).toHaveBeenCalled()
+      // Should have soft-deleted topic in DB via update (not hard-delete)
+      expect(mockDb.update).toHaveBeenCalled()
+      // No transaction needed (no cascade delete of replies)
+      expect(mockDb.transaction).not.toHaveBeenCalled()
     })
 
     it('deletes topic as moderator (index-only delete, not from PDS)', async () => {
@@ -1239,8 +1241,8 @@ describe('topic routes', () => {
       // Moderator should NOT delete from PDS
       expect(deleteRecordFn).not.toHaveBeenCalled()
 
-      // But should delete from DB index
-      expect(mockDb.delete).toHaveBeenCalled()
+      // But should soft-delete in DB index
+      expect(mockDb.update).toHaveBeenCalled()
 
       await modApp.close()
     })

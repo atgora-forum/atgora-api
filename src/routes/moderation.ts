@@ -1,5 +1,6 @@
 import { eq, and, desc, sql } from 'drizzle-orm'
 import type { FastifyPluginCallback } from 'fastify'
+import { getCommunityDid } from '../config/env.js'
 import { notFound, forbidden, badRequest, conflict } from '../lib/api-errors.js'
 import {
   lockTopicSchema,
@@ -143,7 +144,7 @@ export function moderationRoutes(): FastifyPluginCallback {
     const { db, env, authMiddleware } = app
     const requireModerator = createRequireModerator(db, authMiddleware, app.log)
     const requireAdmin = app.requireAdmin
-    const communityDid = env.COMMUNITY_DID ?? 'did:plc:placeholder'
+    const communityDid = getCommunityDid(env)
     const notificationService = createNotificationService(db, app.log)
 
     // -------------------------------------------------------------------

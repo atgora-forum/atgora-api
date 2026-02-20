@@ -894,7 +894,7 @@ describe('reply routes', () => {
           mutedDids: [],
         },
       ])
-      // eslint-disable-next-line @typescript-eslint/no-misused-promises -- thenable mock for Drizzle chain
+       
       selectChain.where.mockImplementationOnce(() => selectChain) // 6: replies .where
 
       const rows = [
@@ -1238,7 +1238,7 @@ describe('reply routes', () => {
       deleteRecordFn.mockResolvedValue(undefined)
     })
 
-    it('deletes a reply when user is the author (deletes from PDS + DB)', async () => {
+    it('soft-deletes a reply when user is the author (deletes from PDS, soft-deletes in DB)', async () => {
       const existingRow = sampleReplyRow()
       selectChain.where.mockResolvedValueOnce([existingRow])
 
@@ -1255,14 +1255,12 @@ describe('reply routes', () => {
       expect(deleteRecordFn).toHaveBeenCalledOnce()
       expect(deleteRecordFn.mock.calls[0]?.[0]).toBe(TEST_DID)
 
-      // Should have deleted from DB
-      expect(mockDb.delete).toHaveBeenCalled()
-
-      // Should have decremented topic replyCount
+      // Should have soft-deleted in DB (update, not delete) + decremented replyCount
       expect(mockDb.update).toHaveBeenCalled()
+      expect(mockDb.delete).not.toHaveBeenCalled()
     })
 
-    it('deletes reply as moderator (index-only delete, not from PDS)', async () => {
+    it('soft-deletes reply as moderator (index-only soft-delete, not from PDS)', async () => {
       const modApp = await buildTestApp(testUser({ did: MOD_DID, handle: 'mod.bsky.social' }))
 
       const existingRow = sampleReplyRow({ authorDid: OTHER_DID })
@@ -1280,7 +1278,9 @@ describe('reply routes', () => {
 
       expect(response.statusCode).toBe(204)
       expect(deleteRecordFn).not.toHaveBeenCalled()
-      expect(mockDb.delete).toHaveBeenCalled()
+      // Soft-delete: update instead of delete
+      expect(mockDb.update).toHaveBeenCalled()
+      expect(mockDb.delete).not.toHaveBeenCalled()
 
       await modApp.close()
     })

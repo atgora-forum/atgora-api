@@ -1,5 +1,6 @@
 import { eq, and, sql, asc, notInArray } from 'drizzle-orm'
 import type { FastifyPluginCallback } from 'fastify'
+import { getCommunityDid } from '../config/env.js'
 import { createPdsClient } from '../lib/pds-client.js'
 import { notFound, forbidden, badRequest } from '../lib/api-errors.js'
 import { resolveMaxMaturity, maturityAllows } from '../lib/content-filter.js'
@@ -24,6 +25,7 @@ import { categories } from '../db/schema/categories.js'
 import { communitySettings } from '../db/schema/community-settings.js'
 import { checkOnboardingComplete } from '../lib/onboarding-gate.js'
 import { createNotificationService } from '../services/notification.js'
+import { extractRkey } from '../lib/at-uri.js'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -105,8 +107,8 @@ function serializeReply(row: typeof replies.$inferSelect) {
     uri: row.uri,
     rkey: row.rkey,
     authorDid: row.authorDid,
-    content: row.content,
-    contentFormat: row.contentFormat ?? null,
+    content: row.isAuthorDeleted ? '' : row.content,
+    contentFormat: row.isAuthorDeleted ? null : (row.contentFormat ?? null),
     rootUri: row.rootUri,
     rootCid: row.rootCid,
     parentUri: row.parentUri,
@@ -116,6 +118,7 @@ function serializeReply(row: typeof replies.$inferSelect) {
     cid: row.cid,
     depth,
     reactionCount: row.reactionCount,
+    isAuthorDeleted: row.isAuthorDeleted,
     createdAt: row.createdAt.toISOString(),
     indexedAt: row.indexedAt.toISOString(),
   }
@@ -144,19 +147,6 @@ function decodeCursor(cursor: string): { createdAt: string; uri: string } | null
   } catch {
     return null
   }
-}
-
-/**
- * Extract the rkey from an AT URI.
- * Format: at://did:plc:xxx/collection/rkey
- */
-function extractRkey(uri: string): string {
-  const parts = uri.split('/')
-  const rkey = parts[parts.length - 1]
-  if (!rkey) {
-    throw badRequest('Invalid AT URI: missing rkey')
-  }
-  return rkey
 }
 
 // ---------------------------------------------------------------------------
@@ -536,7 +526,7 @@ export function replyRoutes(): FastifyPluginCallback {
         }
 
         // Maturity check: verify the topic's category is within the user's allowed level
-        const communityDid = env.COMMUNITY_DID ?? 'did:plc:placeholder'
+        const communityDid = getCommunityDid(env)
         const catRows = await db
           .select({ maturityRating: categories.maturityRating })
           .from(categories)
@@ -619,8 +609,8 @@ export function replyRoutes(): FastifyPluginCallback {
         const ozoneMap = new Map<string, string | null>()
         if (app.ozoneService) {
           const uniqueDids = [...new Set(serialized.map((r) => r.authorDid))]
-          for (const did of uniqueDids) {
-            const isSpam = await app.ozoneService.isSpamLabeled(did)
+          const spamMap = await app.ozoneService.batchIsSpamLabeled(uniqueDids)
+          for (const [did, isSpam] of spamMap) {
             ozoneMap.set(did, isSpam ? 'spam' : null)
           }
         }
@@ -858,9 +848,12 @@ export function replyRoutes(): FastifyPluginCallback {
             await pdsClient.deleteRecord(user.did, COLLECTION, rkey)
           }
 
-          // Delete reply and update topic replyCount in a transaction
+          // Soft-delete reply and update topic replyCount in a transaction
           await db.transaction(async (tx) => {
-            await tx.delete(replies).where(eq(replies.uri, decodedUri))
+            await tx
+              .update(replies)
+              .set({ isAuthorDeleted: true })
+              .where(eq(replies.uri, decodedUri))
             await tx
               .update(topics)
               .set({

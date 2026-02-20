@@ -463,6 +463,112 @@ describe('RecordHandler', () => {
     })
   })
 
+  describe('delete with DB lookup', () => {
+    it('resolves rootUri from DB for reply deletes', async () => {
+      db.select.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi
+            .fn()
+            .mockResolvedValue([{ rootUri: 'at://did:plc:test/forum.barazo.topic.post/t1' }]),
+        }),
+      })
+
+      const event: RecordEvent = {
+        id: 20,
+        action: 'delete',
+        did: 'did:plc:test',
+        rev: 'rev3',
+        collection: 'forum.barazo.topic.reply',
+        rkey: 'reply1',
+        live: true,
+      }
+
+      await handler.handle(event)
+
+      expect(replyIndexer.handleDelete).toHaveBeenCalledWith({
+        uri: 'at://did:plc:test/forum.barazo.topic.reply/reply1',
+        rkey: 'reply1',
+        did: 'did:plc:test',
+        rootUri: 'at://did:plc:test/forum.barazo.topic.post/t1',
+      })
+    })
+
+    it('resolves subjectUri from DB for reaction deletes', async () => {
+      db.select.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi
+            .fn()
+            .mockResolvedValue([{ subjectUri: 'at://did:plc:test/forum.barazo.topic.post/t1' }]),
+        }),
+      })
+
+      const event: RecordEvent = {
+        id: 21,
+        action: 'delete',
+        did: 'did:plc:test',
+        rev: 'rev3',
+        collection: 'forum.barazo.interaction.reaction',
+        rkey: 'react1',
+        live: true,
+      }
+
+      await handler.handle(event)
+
+      expect(reactionIndexer.handleDelete).toHaveBeenCalledWith({
+        uri: 'at://did:plc:test/forum.barazo.interaction.reaction/react1',
+        rkey: 'react1',
+        did: 'did:plc:test',
+        subjectUri: 'at://did:plc:test/forum.barazo.topic.post/t1',
+      })
+    })
+
+    it('passes empty rootUri when reply not found in DB', async () => {
+      // Default mock returns [] — reply already deleted or never indexed
+      const event: RecordEvent = {
+        id: 22,
+        action: 'delete',
+        did: 'did:plc:test',
+        rev: 'rev3',
+        collection: 'forum.barazo.topic.reply',
+        rkey: 'missing1',
+        live: true,
+      }
+
+      await handler.handle(event)
+
+      expect(replyIndexer.handleDelete).toHaveBeenCalledWith({
+        uri: 'at://did:plc:test/forum.barazo.topic.reply/missing1',
+        rkey: 'missing1',
+        did: 'did:plc:test',
+        rootUri: '',
+      })
+      expect(logger.debug).toHaveBeenCalled()
+    })
+
+    it('passes empty subjectUri when reaction not found in DB', async () => {
+      // Default mock returns []
+      const event: RecordEvent = {
+        id: 23,
+        action: 'delete',
+        did: 'did:plc:test',
+        rev: 'rev3',
+        collection: 'forum.barazo.interaction.reaction',
+        rkey: 'missing1',
+        live: true,
+      }
+
+      await handler.handle(event)
+
+      expect(reactionIndexer.handleDelete).toHaveBeenCalledWith({
+        uri: 'at://did:plc:test/forum.barazo.interaction.reaction/missing1',
+        rkey: 'missing1',
+        did: 'did:plc:test',
+        subjectUri: '',
+      })
+      expect(logger.debug).toHaveBeenCalled()
+    })
+  })
+
   describe('live flag', () => {
     it('passes live flag through to indexer', async () => {
       const event: RecordEvent = {

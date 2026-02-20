@@ -1,5 +1,6 @@
 import { eq, and, desc, sql, inArray, notInArray, isNotNull, ne, or } from 'drizzle-orm'
 import type { FastifyPluginCallback } from 'fastify'
+import { getCommunityDid } from '../config/env.js'
 import { createPdsClient } from '../lib/pds-client.js'
 import { notFound, forbidden, badRequest } from '../lib/api-errors.js'
 import { resolveMaxMaturity, allowedRatings, maturityAllows } from '../lib/content-filter.js'
@@ -20,12 +21,12 @@ import {
 import { tooManyRequests } from '../lib/api-errors.js'
 import { moderationQueue } from '../db/schema/moderation-queue.js'
 import { topics } from '../db/schema/topics.js'
-import { replies } from '../db/schema/replies.js'
 import { users } from '../db/schema/users.js'
 import { categories } from '../db/schema/categories.js'
 import { communitySettings } from '../db/schema/community-settings.js'
 import { checkOnboardingComplete } from '../lib/onboarding-gate.js'
 import { createNotificationService } from '../services/notification.js'
+import { extractRkey } from '../lib/at-uri.js'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -104,9 +105,9 @@ function serializeTopic(row: typeof topics.$inferSelect, categoryMaturityRating:
     uri: row.uri,
     rkey: row.rkey,
     authorDid: row.authorDid,
-    title: row.title,
-    content: row.content,
-    contentFormat: row.contentFormat ?? null,
+    title: row.isAuthorDeleted ? '[Deleted by author]' : row.title,
+    content: row.isAuthorDeleted ? '' : row.content,
+    contentFormat: row.isAuthorDeleted ? null : (row.contentFormat ?? null),
     category: row.category,
     tags: row.tags ?? null,
     labels: row.labels ?? null,
@@ -114,6 +115,7 @@ function serializeTopic(row: typeof topics.$inferSelect, categoryMaturityRating:
     cid: row.cid,
     replyCount: row.replyCount,
     reactionCount: row.reactionCount,
+    isAuthorDeleted: row.isAuthorDeleted,
     categoryMaturityRating,
     lastActivityAt: row.lastActivityAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
@@ -144,19 +146,6 @@ function decodeCursor(cursor: string): { lastActivityAt: string; uri: string } |
   } catch {
     return null
   }
-}
-
-/**
- * Extract the rkey from an AT URI.
- * Format: at://did:plc:xxx/collection/rkey
- */
-function extractRkey(uri: string): string {
-  const parts = uri.split('/')
-  const rkey = parts[parts.length - 1]
-  if (!rkey) {
-    throw badRequest('Invalid AT URI: missing rkey')
-  }
-  return rkey
 }
 
 // ---------------------------------------------------------------------------
@@ -262,7 +251,7 @@ export function topicRoutes(): FastifyPluginCallback {
 
         const { title, content, category, tags, labels } = parsed.data
         const now = new Date().toISOString()
-        const communityDid = env.COMMUNITY_DID ?? 'did:plc:placeholder'
+        const communityDid = getCommunityDid(env)
 
         // Onboarding gate: block if user hasn't completed mandatory onboarding
         const onboarding = await checkOnboardingComplete(db, user.did, communityDid)
@@ -624,7 +613,7 @@ export function topicRoutes(): FastifyPluginCallback {
           // Single mode: filter by the one configured community
           // ---------------------------------------------------------------
 
-          const communityDid = env.COMMUNITY_DID ?? 'did:plc:placeholder'
+          const communityDid = getCommunityDid(env)
 
           // Get category slugs matching allowed maturity levels
           const allowedCategories = await db
@@ -652,8 +641,9 @@ export function topicRoutes(): FastifyPluginCallback {
           conditions.push(inArray(topics.category, allowedSlugs))
         }
 
-        // Only show approved content in public listings
+        // Only show approved, non-deleted content in public listings
         conditions.push(eq(topics.moderationStatus, 'approved'))
+        conditions.push(eq(topics.isAuthorDeleted, false))
 
         // Block/mute filtering: load the authenticated user's preferences
         const { blockedDids, mutedDids } = await loadBlockMuteLists(request.user?.did, db)
@@ -704,8 +694,8 @@ export function topicRoutes(): FastifyPluginCallback {
         const ozoneMap = new Map<string, string | null>()
         if (app.ozoneService) {
           const uniqueDids = [...new Set(serialized.map((t) => t.authorDid))]
-          for (const did of uniqueDids) {
-            const isSpam = await app.ozoneService.isSpamLabeled(did)
+          const spamMap = await app.ozoneService.batchIsSpamLabeled(uniqueDids)
+          for (const [did, isSpam] of spamMap) {
             ozoneMap.set(did, isSpam ? 'spam' : null)
           }
         }
@@ -785,7 +775,7 @@ export function topicRoutes(): FastifyPluginCallback {
         }
 
         // Look up the category maturity rating
-        const communityDid = env.COMMUNITY_DID ?? 'did:plc:placeholder'
+        const communityDid = getCommunityDid(env)
         const catRows = await db
           .select({ maturityRating: categories.maturityRating })
           .from(categories)
@@ -833,7 +823,7 @@ export function topicRoutes(): FastifyPluginCallback {
         }
 
         // Maturity check: verify the topic's category is within the user's allowed level
-        const communityDid = env.COMMUNITY_DID ?? 'did:plc:placeholder'
+        const communityDid = getCommunityDid(env)
         const catRows = await db
           .select({ maturityRating: categories.maturityRating })
           .from(categories)
@@ -1081,11 +1071,8 @@ export function topicRoutes(): FastifyPluginCallback {
             app.log.warn({ err, topicUri: decodedUri }, 'Failed to delete cross-posts')
           })
 
-          // Cascade delete in a transaction for consistency
-          await db.transaction(async (tx) => {
-            await tx.delete(replies).where(eq(replies.rootUri, decodedUri))
-            await tx.delete(topics).where(eq(topics.uri, decodedUri))
-          })
+          // Soft-delete: mark as author-deleted, preserve replies (they belong to other users)
+          await db.update(topics).set({ isAuthorDeleted: true }).where(eq(topics.uri, decodedUri))
 
           return await reply.status(204).send()
         } catch (err: unknown) {

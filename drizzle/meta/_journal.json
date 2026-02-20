@@ -176,6 +176,20 @@
       "when": 1771280352200,
       "tag": "0024_grey_skreet",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1771459200000,
+      "tag": "0025_author_soft_delete",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1771459200001,
+      "tag": "0026_composite_indexes",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { envSchema, parseEnv } from '../../../src/config/env.js'
+import { envSchema, parseEnv, getCommunityDid } from '../../../src/config/env.js'
+import type { Env } from '../../../src/config/env.js'
 
 describe('envSchema', () => {
   const validEnv = {
@@ -16,6 +17,7 @@ describe('envSchema', () => {
     LOG_LEVEL: 'info',
     CORS_ORIGINS: 'http://localhost:3001',
     COMMUNITY_MODE: 'single',
+    COMMUNITY_DID: 'did:plc:testcommunity123',
   }
 
   it('parses valid environment variables', () => {
@@ -95,6 +97,7 @@ describe('envSchema', () => {
       OAUTH_CLIENT_ID: validEnv.OAUTH_CLIENT_ID,
       OAUTH_REDIRECT_URI: validEnv.OAUTH_REDIRECT_URI,
       SESSION_SECRET: validEnv.SESSION_SECRET,
+      COMMUNITY_DID: validEnv.COMMUNITY_DID,
     })
     expect(result.success).toBe(true)
     if (result.success) {
@@ -202,6 +205,61 @@ describe('envSchema', () => {
       OAUTH_ACCESS_TOKEN_TTL: '-1',
     })
     expect(result.success).toBe(false)
+  })
+})
+
+describe('COMMUNITY_DID validation', () => {
+  const baseEnv = {
+    DATABASE_URL: 'postgresql://barazo:barazo_dev@localhost:5432/barazo',
+    VALKEY_URL: 'redis://localhost:6379',
+    TAP_URL: 'http://localhost:2480',
+    TAP_ADMIN_PASSWORD: 'tap_dev_secret',
+    OAUTH_CLIENT_ID:
+      'http://localhost?redirect_uri=http%3A%2F%2F127.0.0.1%3A3000%2Fapi%2Fauth%2Fcallback',
+    OAUTH_REDIRECT_URI: 'http://127.0.0.1:3000/api/auth/callback',
+    SESSION_SECRET: 'a-very-long-session-secret-that-is-at-least-32-characters',
+  }
+
+  it('rejects single mode without COMMUNITY_DID', () => {
+    const result = envSchema.safeParse({
+      ...baseEnv,
+      COMMUNITY_MODE: 'single',
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('accepts single mode with COMMUNITY_DID', () => {
+    const result = envSchema.safeParse({
+      ...baseEnv,
+      COMMUNITY_MODE: 'single',
+      COMMUNITY_DID: 'did:plc:testcommunity',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('accepts global mode without COMMUNITY_DID', () => {
+    const result = envSchema.safeParse({
+      ...baseEnv,
+      COMMUNITY_MODE: 'global',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects default mode (single) without COMMUNITY_DID', () => {
+    const result = envSchema.safeParse(baseEnv)
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('getCommunityDid', () => {
+  it('returns COMMUNITY_DID when set', () => {
+    const env = { COMMUNITY_DID: 'did:plc:test123' } as Env
+    expect(getCommunityDid(env)).toBe('did:plc:test123')
+  })
+
+  it('throws when COMMUNITY_DID is undefined', () => {
+    const env = { COMMUNITY_DID: undefined } as Env
+    expect(() => getCommunityDid(env)).toThrow('COMMUNITY_DID is required')
   })
 })
 

@@ -84,7 +84,7 @@ export function createPdsClient(oauthClient: NodeOAuthClient, logger: Logger): P
         const response = await agent.com.atproto.repo.createRecord({
           repo: did,
           collection,
-          record,
+          record: { $type: collection, ...record },
         })
 
         return { uri: response.data.uri, cid: response.data.cid }
@@ -108,7 +108,7 @@ export function createPdsClient(oauthClient: NodeOAuthClient, logger: Logger): P
           repo: did,
           collection,
           rkey,
-          record,
+          record: { $type: collection, ...record },
         })
 
         return { uri: response.data.uri, cid: response.data.cid }

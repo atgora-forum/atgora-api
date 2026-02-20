@@ -22,6 +22,7 @@ export const topics = pgTable(
     isLocked: boolean('is_locked').notNull().default(false),
     isPinned: boolean('is_pinned').notNull().default(false),
     isModDeleted: boolean('is_mod_deleted').notNull().default(false),
+    isAuthorDeleted: boolean('is_author_deleted').notNull().default(false),
     moderationStatus: text('moderation_status', {
       enum: ['approved', 'held', 'rejected'],
     })
@@ -46,5 +47,10 @@ export const topics = pgTable(
     index('topics_community_did_idx').on(table.communityDid),
     index('topics_moderation_status_idx').on(table.moderationStatus),
     index('topics_trust_status_idx').on(table.trustStatus),
+    index('topics_community_category_activity_idx').on(
+      table.communityDid,
+      table.category,
+      table.lastActivityAt
+    ),
   ]
 )

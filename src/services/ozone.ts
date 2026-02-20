@@ -1,4 +1,4 @@
-import { eq, and } from 'drizzle-orm'
+import { eq, and, inArray } from 'drizzle-orm'
 import type { Database } from '../db/index.js'
 import type { Cache } from '../cache/index.js'
 import type { Logger } from '../lib/logger.js'
@@ -216,5 +216,72 @@ export class OzoneService {
   async isSpamLabeled(didOrUri: string): Promise<boolean> {
     const labels = await this.getLabels(didOrUri)
     return labels.some((l) => SPAM_LABELS.has(l.val))
+  }
+
+  /**
+   * Batch check which DIDs have spam-related labels.
+   * Uses a single DB query for all cache misses instead of N+1 individual queries.
+   */
+  async batchIsSpamLabeled(dids: string[]): Promise<Map<string, boolean>> {
+    const result = new Map<string, boolean>()
+    if (dids.length === 0) return result
+
+    const uncached: string[] = []
+
+    // Check cache first
+    for (const did of dids) {
+      const cacheKey = `${CACHE_PREFIX}${did}`
+      try {
+        const cached = await this.cache.get(cacheKey)
+        if (cached) {
+          const labels = JSON.parse(cached) as CachedLabel[]
+          result.set(
+            did,
+            labels.some((l) => SPAM_LABELS.has(l.val))
+          )
+          continue
+        }
+      } catch {
+        // Fall through to DB
+      }
+      uncached.push(did)
+    }
+
+    if (uncached.length === 0) return result
+
+    // Batch DB query for all uncached DIDs
+    const rows = await this.db
+      .select({
+        uri: ozoneLabels.uri,
+        val: ozoneLabels.val,
+        src: ozoneLabels.src,
+        neg: ozoneLabels.neg,
+      })
+      .from(ozoneLabels)
+      .where(and(inArray(ozoneLabels.uri, uncached), eq(ozoneLabels.neg, false)))
+
+    // Group by URI
+    const labelsByUri = new Map<string, CachedLabel[]>()
+    for (const row of rows) {
+      const labels = labelsByUri.get(row.uri) ?? []
+      labels.push({ val: row.val, src: row.src, neg: row.neg })
+      labelsByUri.set(row.uri, labels)
+    }
+
+    // Cache and build results
+    for (const did of uncached) {
+      const labels = labelsByUri.get(did) ?? []
+      result.set(
+        did,
+        labels.some((l) => SPAM_LABELS.has(l.val))
+      )
+      try {
+        await this.cache.set(`${CACHE_PREFIX}${did}`, JSON.stringify(labels), 'EX', CACHE_TTL)
+      } catch {
+        // Non-critical
+      }
+    }
+
+    return result
   }
 }

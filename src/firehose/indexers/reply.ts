@@ -4,6 +4,7 @@ import { topics } from '../../db/schema/topics.js'
 import type { Database } from '../../db/index.js'
 import type { Logger } from '../../lib/logger.js'
 import type { TrustStatus } from '../../services/account-age.js'
+import { clampCreatedAt } from '../clamp-timestamp.js'
 
 interface CreateParams {
   uri: string
@@ -39,10 +40,12 @@ export class ReplyIndexer {
   ) {}
 
   async handleCreate(params: CreateParams): Promise<void> {
-    const { uri, rkey, did, cid, record, trustStatus } = params
+    const { uri, rkey, did, cid, record, live, trustStatus } = params
 
     const root = record['root'] as { uri: string; cid: string }
     const parent = record['parent'] as { uri: string; cid: string }
+    const clientCreatedAt = new Date(record['createdAt'] as string)
+    const createdAt = live ? clampCreatedAt(clientCreatedAt) : clientCreatedAt
 
     await this.db.transaction(async (tx) => {
       await tx
@@ -60,7 +63,7 @@ export class ReplyIndexer {
           communityDid: record['community'] as string,
           cid,
           labels: (record['labels'] as { values: { val: string }[] } | undefined) ?? null,
-          createdAt: new Date(record['createdAt'] as string),
+          createdAt,
           trustStatus,
         })
         .onConflictDoNothing()
@@ -99,17 +102,19 @@ export class ReplyIndexer {
     const { uri, rootUri } = params
 
     await this.db.transaction(async (tx) => {
-      await tx.delete(replies).where(eq(replies.uri, uri))
+      await tx.update(replies).set({ isAuthorDeleted: true }).where(eq(replies.uri, uri))
 
       // Decrement reply count (floor at 0 via GREATEST)
-      await tx
-        .update(topics)
-        .set({
-          replyCount: sql`GREATEST(${topics.replyCount} - 1, 0)`,
-        })
-        .where(eq(topics.uri, rootUri))
+      if (rootUri) {
+        await tx
+          .update(topics)
+          .set({
+            replyCount: sql`GREATEST(${topics.replyCount} - 1, 0)`,
+          })
+          .where(eq(topics.uri, rootUri))
+      }
     })
 
-    this.logger.debug({ uri }, 'Deleted reply')
+    this.logger.debug({ uri }, 'Soft-deleted reply (author delete)')
   }
 }

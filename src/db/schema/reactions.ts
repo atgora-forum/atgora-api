@@ -21,5 +21,6 @@ export const reactions = pgTable(
     // communityDid intentionally excluded: AT URIs are globally unique, so a
     // reaction to a given subject is inherently community-scoped via the subject URI.
     unique('reactions_author_subject_type_uniq').on(table.authorDid, table.subjectUri, table.type),
+    index('reactions_subject_uri_type_idx').on(table.subjectUri, table.type),
   ]
 )
