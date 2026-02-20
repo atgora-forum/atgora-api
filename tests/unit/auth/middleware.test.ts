@@ -4,6 +4,7 @@ import type { FastifyInstance } from 'fastify'
 import { createAuthMiddleware } from '../../../src/auth/middleware.js'
 import type { RequestUser } from '../../../src/auth/middleware.js'
 import type { SessionService, Session } from '../../../src/auth/session.js'
+import type { DidDocumentVerifier } from '../../../src/lib/did-document-verifier.js'
 import type { Logger } from '../../../src/lib/logger.js'
 
 // ---------------------------------------------------------------------------
@@ -11,6 +12,8 @@ import type { Logger } from '../../../src/lib/logger.js'
 // ---------------------------------------------------------------------------
 
 const validateAccessTokenFn = vi.fn<(...args: unknown[]) => Promise<Session | undefined>>()
+const verifyDidFn =
+  vi.fn<(...args: unknown[]) => Promise<{ active: true } | { active: false; reason: string }>>()
 
 function createMockSessionService(): SessionService {
   return {
@@ -19,6 +22,12 @@ function createMockSessionService(): SessionService {
     refreshSession: vi.fn(),
     deleteSession: vi.fn(),
     deleteAllSessionsForDid: vi.fn(),
+  }
+}
+
+function createMockDidVerifier(): DidDocumentVerifier {
+  return {
+    verify: verifyDidFn,
   }
 }
 
@@ -64,8 +73,9 @@ describe('requireAuth middleware', () => {
   beforeAll(async () => {
     const mockSessionService = createMockSessionService()
     const mockLogger = createMockLogger()
+    const mockDidVerifier = createMockDidVerifier()
 
-    const { requireAuth } = createAuthMiddleware(mockSessionService, mockLogger)
+    const { requireAuth } = createAuthMiddleware(mockSessionService, mockDidVerifier, mockLogger)
 
     app = Fastify({ logger: false })
 
@@ -85,6 +95,8 @@ describe('requireAuth middleware', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    // Default: DID verification passes
+    verifyDidFn.mockResolvedValue({ active: true })
   })
 
   it('returns 401 for missing Authorization header', async () => {
@@ -133,8 +145,9 @@ describe('requireAuth middleware', () => {
     expect(validateAccessTokenFn).toHaveBeenCalledWith(VALID_TOKEN)
   })
 
-  it('sets request.user and returns 200 for valid token', async () => {
+  it('sets request.user and returns 200 for valid token with active DID', async () => {
     validateAccessTokenFn.mockResolvedValueOnce(VALID_SESSION)
+    verifyDidFn.mockResolvedValueOnce({ active: true })
 
     const response = await app.inject({
       method: 'GET',
@@ -151,6 +164,59 @@ describe('requireAuth middleware', () => {
       sid: VALID_SESSION.sid,
     })
     expect(validateAccessTokenFn).toHaveBeenCalledWith(VALID_TOKEN)
+    expect(verifyDidFn).toHaveBeenCalledWith(VALID_SESSION.did)
+  })
+
+  it('returns 401 when DID is deactivated/tombstoned', async () => {
+    validateAccessTokenFn.mockResolvedValueOnce(VALID_SESSION)
+    verifyDidFn.mockResolvedValueOnce({ active: false, reason: 'DID has been tombstoned' })
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/test',
+      headers: { authorization: `Bearer ${VALID_TOKEN}` },
+    })
+
+    expect(response.statusCode).toBe(401)
+    expect(response.json<{ error: string }>()).toStrictEqual({
+      error: 'DID is no longer active',
+    })
+  })
+
+  it('returns 502 when DID verification fails with resolution error', async () => {
+    validateAccessTokenFn.mockResolvedValueOnce(VALID_SESSION)
+    verifyDidFn.mockResolvedValueOnce({
+      active: false,
+      reason: 'DID document resolution failed',
+    })
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/test',
+      headers: { authorization: `Bearer ${VALID_TOKEN}` },
+    })
+
+    expect(response.statusCode).toBe(502)
+    expect(response.json<{ error: string }>()).toStrictEqual({
+      error: 'Service temporarily unavailable',
+    })
+  })
+
+  it('returns 502 when DID verifier throws', async () => {
+    validateAccessTokenFn.mockResolvedValueOnce(VALID_SESSION)
+    verifyDidFn.mockRejectedValueOnce(new Error('Unexpected error'))
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/test',
+      headers: { authorization: `Bearer ${VALID_TOKEN}` },
+    })
+
+    expect(response.statusCode).toBe(502)
+    expect(response.json<{ error: string }>()).toStrictEqual({
+      error: 'Service temporarily unavailable',
+    })
+    expect(logErrorFn).toHaveBeenCalledOnce()
   })
 
   it('returns 502 when sessionService throws', async () => {
@@ -180,8 +246,9 @@ describe('optionalAuth middleware', () => {
   beforeAll(async () => {
     const mockSessionService = createMockSessionService()
     const mockLogger = createMockLogger()
+    const mockDidVerifier = createMockDidVerifier()
 
-    const { optionalAuth } = createAuthMiddleware(mockSessionService, mockLogger)
+    const { optionalAuth } = createAuthMiddleware(mockSessionService, mockDidVerifier, mockLogger)
 
     app = Fastify({ logger: false })
 
@@ -201,10 +268,13 @@ describe('optionalAuth middleware', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    // Default: DID verification passes
+    verifyDidFn.mockResolvedValue({ active: true })
   })
 
-  it('sets request.user for valid token', async () => {
+  it('sets request.user for valid token with active DID', async () => {
     validateAccessTokenFn.mockResolvedValueOnce(VALID_SESSION)
+    verifyDidFn.mockResolvedValueOnce({ active: true })
 
     const response = await app.inject({
       method: 'GET',
@@ -243,6 +313,36 @@ describe('optionalAuth middleware', () => {
 
     expect(response.statusCode).toBe(200)
     expect(response.json<{ user: null }>()).toStrictEqual({ user: null })
+  })
+
+  it('continues with request.user undefined when DID is deactivated', async () => {
+    validateAccessTokenFn.mockResolvedValueOnce(VALID_SESSION)
+    verifyDidFn.mockResolvedValueOnce({ active: false, reason: 'DID has been tombstoned' })
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/test',
+      headers: { authorization: `Bearer ${VALID_TOKEN}` },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json<{ user: null }>()).toStrictEqual({ user: null })
+    expect(logWarnFn).toHaveBeenCalledOnce()
+  })
+
+  it('continues with request.user undefined when DID verifier throws', async () => {
+    validateAccessTokenFn.mockResolvedValueOnce(VALID_SESSION)
+    verifyDidFn.mockRejectedValueOnce(new Error('Unexpected error'))
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/test',
+      headers: { authorization: `Bearer ${VALID_TOKEN}` },
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.json<{ user: null }>()).toStrictEqual({ user: null })
+    expect(logWarnFn).toHaveBeenCalledOnce()
   })
 
   it('continues with request.user undefined when sessionService throws and logs warning', async () => {
