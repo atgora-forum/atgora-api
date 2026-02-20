@@ -103,7 +103,7 @@ describe('TopicIndexer', () => {
   })
 
   describe('handleDelete', () => {
-    it('deletes a topic by URI', async () => {
+    it('soft-deletes a topic by URI', async () => {
       const db = createMockDb()
       const logger = createMockLogger()
       const indexer = new TopicIndexer(db as never, logger as never)
@@ -114,7 +114,8 @@ describe('TopicIndexer', () => {
         did: baseParams.did,
       })
 
-      expect(db.delete).toHaveBeenCalledTimes(1)
+      expect(db.update).toHaveBeenCalledTimes(1)
+      expect(db.delete).not.toHaveBeenCalled()
     })
   })
 })

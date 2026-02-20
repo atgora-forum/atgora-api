@@ -1,6 +1,6 @@
 import { topicPostSchema, topicReplySchema, reactionSchema } from '@barazo-forum/lexicons'
 import type { SupportedCollection } from './types.js'
-import { SUPPORTED_COLLECTIONS } from './types.js'
+import { isSupportedCollection } from './types.js'
 
 const MAX_RECORD_SIZE = 64 * 1024 // 64KB
 
@@ -15,10 +15,6 @@ const schemaMap: Record<
   'forum.barazo.topic.post': topicPostSchema,
   'forum.barazo.topic.reply': topicReplySchema,
   'forum.barazo.interaction.reaction': reactionSchema,
-}
-
-function isSupportedCollection(collection: string): collection is SupportedCollection {
-  return (SUPPORTED_COLLECTIONS as readonly string[]).includes(collection)
 }
 
 export function validateRecord(collection: string, record: unknown): ValidationResult {

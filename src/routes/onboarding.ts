@@ -1,5 +1,6 @@
 import { eq, and, asc } from 'drizzle-orm'
 import type { FastifyPluginCallback } from 'fastify'
+import { getCommunityDid } from '../config/env.js'
 import { notFound, badRequest, forbidden } from '../lib/api-errors.js'
 import {
   createOnboardingFieldSchema,
@@ -115,7 +116,7 @@ export function onboardingRoutes(): FastifyPluginCallback {
         },
       },
       async (_request, reply) => {
-        const communityDid = env.COMMUNITY_DID ?? 'did:plc:placeholder'
+        const communityDid = getCommunityDid(env)
 
         const fields = await db
           .select()
@@ -165,7 +166,7 @@ export function onboardingRoutes(): FastifyPluginCallback {
           throw badRequest('Invalid onboarding field data')
         }
 
-        const communityDid = env.COMMUNITY_DID ?? 'did:plc:placeholder'
+        const communityDid = getCommunityDid(env)
 
         const inserted = await db
           .insert(communityOnboardingFields)
@@ -247,7 +248,7 @@ export function onboardingRoutes(): FastifyPluginCallback {
           throw badRequest('At least one field must be provided')
         }
 
-        const communityDid = env.COMMUNITY_DID ?? 'did:plc:placeholder'
+        const communityDid = getCommunityDid(env)
 
         const dbUpdates: Record<string, unknown> = { updatedAt: new Date() }
         if (updates.label !== undefined) dbUpdates.label = updates.label
@@ -305,7 +306,7 @@ export function onboardingRoutes(): FastifyPluginCallback {
         },
       },
       async (request, reply) => {
-        const communityDid = env.COMMUNITY_DID ?? 'did:plc:placeholder'
+        const communityDid = getCommunityDid(env)
 
         const deleted = await db
           .delete(communityOnboardingFields)
@@ -375,7 +376,7 @@ export function onboardingRoutes(): FastifyPluginCallback {
           throw badRequest('Invalid reorder data')
         }
 
-        const communityDid = env.COMMUNITY_DID ?? 'did:plc:placeholder'
+        const communityDid = getCommunityDid(env)
 
         // Update each field's sort order
         for (const item of parsed.data) {
@@ -429,7 +430,7 @@ export function onboardingRoutes(): FastifyPluginCallback {
           throw forbidden('Authentication required')
         }
 
-        const communityDid = env.COMMUNITY_DID ?? 'did:plc:placeholder'
+        const communityDid = getCommunityDid(env)
 
         // Get all fields for this community
         const fields = await db
@@ -513,7 +514,7 @@ export function onboardingRoutes(): FastifyPluginCallback {
           throw badRequest('Invalid submission data')
         }
 
-        const communityDid = env.COMMUNITY_DID ?? 'did:plc:placeholder'
+        const communityDid = getCommunityDid(env)
 
         // Fetch all community fields to validate against
         const fields = await db

@@ -521,6 +521,7 @@ async function searchTopicsFulltext(
   const conditions: ReturnType<typeof sql>[] = [
     sql`search_vector @@ websearch_to_tsquery('english', ${query})`,
     sql`is_mod_deleted = false`,
+    sql`is_author_deleted = false`,
   ]
 
   if (filters.category) {
@@ -619,6 +620,7 @@ async function searchTopicsVector(
   const conditions: ReturnType<typeof sql>[] = [
     sql`embedding IS NOT NULL`,
     sql`is_mod_deleted = false`,
+    sql`is_author_deleted = false`,
     sql`embedding <=> ${embeddingStr}::vector < 0.5`,
   ]
 
@@ -716,6 +718,7 @@ async function countSearchResults(
     const conditions: ReturnType<typeof sql>[] = [
       sql`search_vector @@ websearch_to_tsquery('english', ${query})`,
       sql`is_mod_deleted = false`,
+      sql`is_author_deleted = false`,
     ]
 
     if (filters.category) {

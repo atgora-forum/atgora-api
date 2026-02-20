@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp, jsonb, index } from 'drizzle-orm/pg-core'
+import { pgTable, text, integer, timestamp, jsonb, boolean, index } from 'drizzle-orm/pg-core'
 
 export const replies = pgTable(
   'replies',
@@ -18,6 +18,7 @@ export const replies = pgTable(
     reactionCount: integer('reaction_count').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
     indexedAt: timestamp('indexed_at', { withTimezone: true }).notNull().defaultNow(),
+    isAuthorDeleted: boolean('is_author_deleted').notNull().default(false),
     moderationStatus: text('moderation_status', {
       enum: ['approved', 'held', 'rejected'],
     })
@@ -42,5 +43,6 @@ export const replies = pgTable(
     index('replies_community_did_idx').on(table.communityDid),
     index('replies_moderation_status_idx').on(table.moderationStatus),
     index('replies_trust_status_idx').on(table.trustStatus),
+    index('replies_root_uri_created_at_idx').on(table.rootUri, table.createdAt),
   ]
 )

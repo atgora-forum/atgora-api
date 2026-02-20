@@ -53,6 +53,11 @@ export const SUPPORTED_COLLECTIONS = [
 
 export type SupportedCollection = (typeof SUPPORTED_COLLECTIONS)[number]
 
+/** Type guard: is the collection string one of the supported Barazo collections? */
+export function isSupportedCollection(collection: string): collection is SupportedCollection {
+  return (SUPPORTED_COLLECTIONS as readonly string[]).includes(collection)
+}
+
 /** Maps collection NSIDs to short indexer names. */
 export const COLLECTION_MAP: Record<SupportedCollection, string> = {
   'forum.barazo.topic.post': 'topic',

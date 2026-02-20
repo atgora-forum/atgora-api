@@ -4,9 +4,13 @@ import { topics } from '../../db/schema/topics.js'
 import { replies } from '../../db/schema/replies.js'
 import type { Database } from '../../db/index.js'
 import type { Logger } from '../../lib/logger.js'
+import { clampCreatedAt } from '../clamp-timestamp.js'
 
 const TOPIC_COLLECTION = 'forum.barazo.topic.post'
 const REPLY_COLLECTION = 'forum.barazo.topic.reply'
+
+/** Transaction type extracted from Database.transaction() callback parameter */
+type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0]
 
 interface CreateParams {
   uri: string
@@ -39,8 +43,10 @@ export class ReactionIndexer {
   ) {}
 
   async handleCreate(params: CreateParams): Promise<void> {
-    const { uri, rkey, did, cid, record } = params
+    const { uri, rkey, did, cid, record, live } = params
     const subject = record['subject'] as { uri: string; cid: string }
+    const clientCreatedAt = new Date(record['createdAt'] as string)
+    const createdAt = live ? clampCreatedAt(clientCreatedAt) : clientCreatedAt
 
     await this.db.transaction(async (tx) => {
       await tx
@@ -54,11 +60,11 @@ export class ReactionIndexer {
           type: record['type'] as string,
           communityDid: record['community'] as string,
           cid,
-          createdAt: new Date(record['createdAt'] as string),
+          createdAt,
         })
         .onConflictDoNothing()
 
-      await this.incrementReactionCount(tx as never, subject.uri)
+      await this.incrementReactionCount(tx, subject.uri)
     })
 
     this.logger.debug({ uri, did }, 'Indexed reaction')
@@ -69,13 +75,13 @@ export class ReactionIndexer {
 
     await this.db.transaction(async (tx) => {
       await tx.delete(reactions).where(eq(reactions.uri, uri))
-      await this.decrementReactionCount(tx as never, subjectUri)
+      await this.decrementReactionCount(tx, subjectUri)
     })
 
     this.logger.debug({ uri }, 'Deleted reaction')
   }
 
-  private async incrementReactionCount(tx: Database, subjectUri: string): Promise<void> {
+  private async incrementReactionCount(tx: Transaction, subjectUri: string): Promise<void> {
     const collection = getCollectionFromUri(subjectUri)
 
     if (collection === TOPIC_COLLECTION) {
@@ -91,7 +97,7 @@ export class ReactionIndexer {
     }
   }
 
-  private async decrementReactionCount(tx: Database, subjectUri: string): Promise<void> {
+  private async decrementReactionCount(tx: Transaction, subjectUri: string): Promise<void> {
     const collection = getCollectionFromUri(subjectUri)
 
     if (collection === TOPIC_COLLECTION) {

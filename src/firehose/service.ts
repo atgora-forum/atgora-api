@@ -99,12 +99,7 @@ export class FirehoseService {
       })
 
       this.channel = this.tap.channel(indexer)
-      // Start in background (non-blocking)
-      void this.channel.start().catch((err: unknown) => {
-        this.logger.error({ err }, 'Firehose channel error')
-        this.connected = false
-      })
-
+      await this.channel.start()
       this.connected = true
       this.logger.info('Firehose subscription started')
     } catch (err) {

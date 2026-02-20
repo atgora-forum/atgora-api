@@ -385,7 +385,7 @@ describe('topics + replies cross-endpoint integration', () => {
       deleteRecordFn.mockResolvedValue(undefined)
     })
 
-    it('deleting a reply decrements replyCount using GREATEST', async () => {
+    it('soft-deleting a reply decrements replyCount using GREATEST', async () => {
       // Mock: reply lookup for delete
       const existingReply = sampleReplyRow()
       selectChain.where.mockResolvedValueOnce([existingReply])
@@ -399,17 +399,17 @@ describe('topics + replies cross-endpoint integration', () => {
 
       expect(response.statusCode).toBe(204)
 
-      // Verify: reply was deleted from DB
-      expect(mockDb.delete).toHaveBeenCalled()
+      // Verify: reply was soft-deleted (update, not delete)
+      expect(mockDb.update).toHaveBeenCalled()
+      expect(mockDb.delete).not.toHaveBeenCalled()
 
       // Verify: topic replyCount was decremented
-      expect(mockDb.update).toHaveBeenCalled()
       expect(updateChain.set).toHaveBeenCalled()
 
-      const setCall = updateChain.set.mock.calls[0]?.[0] as Record<string, unknown>
-      expect(setCall).toBeDefined()
-      // replyCount should be a SQL expression with GREATEST
-      expect(setCall.replyCount).toBeDefined()
+      // One set call is the soft-delete (isAuthorDeleted), another is the replyCount decrement
+      const setCalls = updateChain.set.mock.calls as Array<[Record<string, unknown>]>
+      const replyCountCall = setCalls.find((c) => c[0].replyCount !== undefined)
+      expect(replyCountCall).toBeDefined()
     })
 
     it('delete reply also deletes from PDS when user is author', async () => {
@@ -437,7 +437,7 @@ describe('topics + replies cross-endpoint integration', () => {
   // Delete topic cascades replies
   // =========================================================================
 
-  describe('delete topic cascades replies', () => {
+  describe('delete topic preserves replies (soft-delete)', () => {
     let app: FastifyInstance
 
     beforeAll(async () => {
@@ -454,9 +454,8 @@ describe('topics + replies cross-endpoint integration', () => {
       deleteRecordFn.mockResolvedValue(undefined)
     })
 
-    it('deleting a topic deletes all its replies via transaction', async () => {
+    it('soft-deletes a topic without cascade-deleting replies', async () => {
       const existingTopic = sampleTopicRow()
-      // Topic lookup
       selectChain.where.mockResolvedValueOnce([existingTopic])
 
       const encodedUri = encodeURIComponent(TEST_TOPIC_URI)
@@ -471,16 +470,13 @@ describe('topics + replies cross-endpoint integration', () => {
       // Should have deleted from PDS (author delete)
       expect(deleteRecordFn).toHaveBeenCalledOnce()
 
-      // Transaction should have been used
-      expect(mockDb.transaction).toHaveBeenCalledOnce()
-
-      // Inside the transaction, both replies and topic should be deleted.
-      // The transaction mock calls fn(mockDb), so mockDb.delete is called for:
-      //   1. replies (cascade), 2. topic itself, 3. cross-posts cleanup (fire-and-forget)
-      expect(mockDb.delete).toHaveBeenCalledTimes(3)
+      // Soft-delete: update isAuthorDeleted, no cascade delete of replies
+      expect(mockDb.update).toHaveBeenCalled()
+      // No transaction needed (no cascade)
+      expect(mockDb.transaction).not.toHaveBeenCalled()
     })
 
-    it('topic cascade delete uses rootUri to find related replies', async () => {
+    it('soft-delete sets isAuthorDeleted on topic only', async () => {
       const existingTopic = sampleTopicRow()
       selectChain.where.mockResolvedValueOnce([existingTopic])
 
@@ -493,11 +489,10 @@ describe('topics + replies cross-endpoint integration', () => {
 
       expect(response.statusCode).toBe(204)
 
-      // Verify delete was called (replies, topic, and cross-posts cleanup)
-      expect(mockDb.delete).toHaveBeenCalledTimes(3)
-
-      // All delete calls should have used .where()
-      expect(deleteChain.where).toHaveBeenCalledTimes(3)
+      // Verify the update was called with isAuthorDeleted
+      expect(updateChain.set).toHaveBeenCalled()
+      const setCall = updateChain.set.mock.calls[0]?.[0] as Record<string, unknown>
+      expect(setCall.isAuthorDeleted).toBe(true)
     })
   })
 
@@ -754,7 +749,7 @@ describe('topics + replies cross-endpoint integration', () => {
       resetAllDbMocks()
       deleteRecordFn.mockResolvedValue(undefined)
 
-      // Step 4: Delete topic (should cascade)
+      // Step 4: Delete topic (soft-delete, no cascade)
       selectChain.where.mockResolvedValueOnce([sampleTopicRow()])
 
       const deleteResponse = await app.inject({
@@ -765,10 +760,8 @@ describe('topics + replies cross-endpoint integration', () => {
 
       expect(deleteResponse.statusCode).toBe(204)
 
-      // Should have cascade-deleted replies via transaction
-      // Delete count: 1. replies (cascade), 2. topic, 3. cross-posts cleanup
-      expect(mockDb.transaction).toHaveBeenCalledOnce()
-      expect(mockDb.delete).toHaveBeenCalledTimes(3)
+      // Soft-delete: update isAuthorDeleted, replies preserved
+      expect(mockDb.update).toHaveBeenCalled()
     })
   })
 })

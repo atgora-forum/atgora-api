@@ -20,7 +20,7 @@ const positiveIntFromString = (defaultVal: string) =>
     .transform((val) => Number(val))
     .pipe(z.number().int().positive())
 
-export const envSchema = z.object({
+const baseEnvSchema = z.object({
   // Required
   DATABASE_URL: z.url(),
   VALKEY_URL: z.url(),
@@ -95,7 +95,27 @@ export const envSchema = z.object({
   OZONE_LABELER_URL: z.string().default('https://mod.bsky.app'),
 })
 
+export const envSchema = baseEnvSchema.refine(
+  (data) =>
+    data.COMMUNITY_MODE !== 'single' || (data.COMMUNITY_DID && data.COMMUNITY_DID.length > 0),
+  {
+    message: 'COMMUNITY_DID is required when COMMUNITY_MODE is "single"',
+    path: ['COMMUNITY_DID'],
+  }
+)
+
 export type Env = z.infer<typeof envSchema>
+
+/**
+ * Get the community DID, throwing if not set.
+ * Safe to call after env validation -- single mode requires COMMUNITY_DID at startup.
+ */
+export function getCommunityDid(env: Env): string {
+  if (!env.COMMUNITY_DID) {
+    throw new Error('COMMUNITY_DID is required in single mode but not set')
+  }
+  return env.COMMUNITY_DID
+}
 
 export function parseEnv(env: Record<string, unknown>): Env {
   const result = envSchema.safeParse(env)
