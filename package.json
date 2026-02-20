@@ -71,5 +71,10 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "catalog:",
     "vitest": "catalog:"
+  },
+  "pnpm": {
+    "overrides": {
+      "minimatch": ">=10.2.1"
+    }
   }
 }
