@@ -1,6 +1,6 @@
 import { eq, and, sql } from 'drizzle-orm'
 import type { FastifyPluginCallback } from 'fastify'
-import { notFound, badRequest } from '../lib/api-errors.js'
+import { notFound, badRequest, errorResponseSchema } from '../lib/api-errors.js'
 import {
   userPreferencesSchema,
   communityPreferencesSchema,
@@ -24,13 +24,6 @@ import { pdsTrustFactors } from '../db/schema/pds-trust-factors.js'
 // ---------------------------------------------------------------------------
 // OpenAPI JSON Schema definitions
 // ---------------------------------------------------------------------------
-
-const errorJsonSchema = {
-  type: 'object' as const,
-  properties: {
-    error: { type: 'string' as const },
-  },
-}
 
 const profileJsonSchema = {
   type: 'object' as const,
@@ -199,7 +192,7 @@ export function profileRoutes(): FastifyPluginCallback {
           },
           response: {
             200: profileJsonSchema,
-            404: errorJsonSchema,
+            404: errorResponseSchema,
           },
         },
       },
@@ -312,7 +305,7 @@ export function profileRoutes(): FastifyPluginCallback {
           },
           response: {
             200: reputationJsonSchema,
-            404: errorJsonSchema,
+            404: errorResponseSchema,
           },
         },
       },
@@ -503,8 +496,8 @@ export function profileRoutes(): FastifyPluginCallback {
                 },
               },
             },
-            400: errorJsonSchema,
-            401: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
           },
         },
       },
@@ -562,7 +555,7 @@ export function profileRoutes(): FastifyPluginCallback {
           security: [{ bearerAuth: [] }],
           response: {
             200: preferencesJsonSchema,
-            401: errorJsonSchema,
+            401: errorResponseSchema,
           },
         },
       },
@@ -629,8 +622,8 @@ export function profileRoutes(): FastifyPluginCallback {
           },
           response: {
             200: preferencesJsonSchema,
-            400: errorJsonSchema,
-            401: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
           },
         },
       },
@@ -725,7 +718,7 @@ export function profileRoutes(): FastifyPluginCallback {
           },
           response: {
             200: communityPrefsJsonSchema,
-            401: errorJsonSchema,
+            401: errorResponseSchema,
           },
         },
       },
@@ -815,8 +808,8 @@ export function profileRoutes(): FastifyPluginCallback {
           },
           response: {
             200: communityPrefsJsonSchema,
-            400: errorJsonSchema,
-            401: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
           },
         },
       },
@@ -908,7 +901,7 @@ export function profileRoutes(): FastifyPluginCallback {
           security: [{ bearerAuth: [] }],
           response: {
             204: { type: 'null' },
-            401: errorJsonSchema,
+            401: errorResponseSchema,
           },
         },
       },

@@ -1,7 +1,7 @@
 import { eq, and, asc } from 'drizzle-orm'
 import type { FastifyPluginCallback } from 'fastify'
 import { getCommunityDid } from '../config/env.js'
-import { notFound, badRequest, forbidden } from '../lib/api-errors.js'
+import { notFound, badRequest, forbidden, errorResponseSchema } from '../lib/api-errors.js'
 import {
   createOnboardingFieldSchema,
   updateOnboardingFieldSchema,
@@ -50,14 +50,6 @@ const onboardingStatusJsonSchema = {
         },
       },
     },
-  },
-}
-
-const errorJsonSchema = {
-  type: 'object' as const,
-  properties: {
-    error: { type: 'string' as const },
-    message: { type: 'string' as const },
   },
 }
 
@@ -110,8 +102,8 @@ export function onboardingRoutes(): FastifyPluginCallback {
               type: 'array' as const,
               items: onboardingFieldJsonSchema,
             },
-            401: errorJsonSchema,
-            403: errorJsonSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
           },
         },
       },
@@ -154,9 +146,9 @@ export function onboardingRoutes(): FastifyPluginCallback {
           },
           response: {
             201: onboardingFieldJsonSchema,
-            400: errorJsonSchema,
-            401: errorJsonSchema,
-            403: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
           },
         },
       },
@@ -224,10 +216,10 @@ export function onboardingRoutes(): FastifyPluginCallback {
           },
           response: {
             200: onboardingFieldJsonSchema,
-            400: errorJsonSchema,
-            401: errorJsonSchema,
-            403: errorJsonSchema,
-            404: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
           },
         },
       },
@@ -299,9 +291,9 @@ export function onboardingRoutes(): FastifyPluginCallback {
               type: 'object' as const,
               properties: { success: { type: 'boolean' as const } },
             },
-            401: errorJsonSchema,
-            403: errorJsonSchema,
-            404: errorJsonSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
           },
         },
       },
@@ -364,9 +356,9 @@ export function onboardingRoutes(): FastifyPluginCallback {
               type: 'array' as const,
               items: onboardingFieldJsonSchema,
             },
-            400: errorJsonSchema,
-            401: errorJsonSchema,
-            403: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
           },
         },
       },
@@ -420,7 +412,7 @@ export function onboardingRoutes(): FastifyPluginCallback {
           security: [{ bearerAuth: [] }],
           response: {
             200: onboardingStatusJsonSchema,
-            401: errorJsonSchema,
+            401: errorResponseSchema,
           },
         },
       },
@@ -498,8 +490,8 @@ export function onboardingRoutes(): FastifyPluginCallback {
                 complete: { type: 'boolean' as const },
               },
             },
-            400: errorJsonSchema,
-            401: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
           },
         },
       },

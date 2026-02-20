@@ -232,8 +232,10 @@ describe('auth routes', () => {
       })
 
       expect(response.statusCode).toBe(502)
-      const body = response.json<{ error: string }>()
-      expect(body.error).toBe('Failed to initiate login')
+      const body = response.json<{ error: string; message: string; statusCode: number }>()
+      expect(body.error).toBe('Bad Gateway')
+      expect(body.message).toBe('Failed to initiate login')
+      expect(body.statusCode).toBe(502)
     })
   })
 
@@ -493,7 +495,7 @@ describe('auth routes', () => {
       expect(body.error).toBe('Invalid or expired token')
     })
 
-    it('returns 502 when session service throws', async () => {
+    it('returns 500 when session service throws', async () => {
       validateAccessTokenFn.mockRejectedValueOnce(new Error('Valkey down'))
 
       const response = await app.inject({
@@ -504,9 +506,11 @@ describe('auth routes', () => {
         },
       })
 
-      expect(response.statusCode).toBe(502)
-      const body = response.json<{ error: string }>()
-      expect(body.error).toBe('Service temporarily unavailable')
+      expect(response.statusCode).toBe(500)
+      const body = response.json<{ error: string; message: string; statusCode: number }>()
+      expect(body.error).toBe('Internal Server Error')
+      expect(body.message).toBe('Service temporarily unavailable')
+      expect(body.statusCode).toBe(500)
     })
   })
 
@@ -515,7 +519,7 @@ describe('auth routes', () => {
   // =========================================================================
 
   describe('service error handling', () => {
-    it('returns 502 when refresh service throws', async () => {
+    it('returns 500 when refresh service throws', async () => {
       refreshSessionFn.mockRejectedValueOnce(new Error('Valkey down'))
 
       const response = await app.inject({
@@ -524,12 +528,14 @@ describe('auth routes', () => {
         cookies: { barazo_refresh: TEST_SID },
       })
 
-      expect(response.statusCode).toBe(502)
-      const body = response.json<{ error: string }>()
-      expect(body.error).toBe('Service temporarily unavailable')
+      expect(response.statusCode).toBe(500)
+      const body = response.json<{ error: string; message: string; statusCode: number }>()
+      expect(body.error).toBe('Internal Server Error')
+      expect(body.message).toBe('Service temporarily unavailable')
+      expect(body.statusCode).toBe(500)
     })
 
-    it('returns 502 when delete service throws', async () => {
+    it('returns 500 when delete service throws', async () => {
       deleteSessionFn.mockRejectedValueOnce(new Error('Valkey down'))
 
       const response = await app.inject({
@@ -538,9 +544,11 @@ describe('auth routes', () => {
         cookies: { barazo_refresh: TEST_SID },
       })
 
-      expect(response.statusCode).toBe(502)
-      const body = response.json<{ error: string }>()
-      expect(body.error).toBe('Service temporarily unavailable')
+      expect(response.statusCode).toBe(500)
+      const body = response.json<{ error: string; message: string; statusCode: number }>()
+      expect(body.error).toBe('Internal Server Error')
+      expect(body.message).toBe('Service temporarily unavailable')
+      expect(body.statusCode).toBe(500)
     })
   })
 

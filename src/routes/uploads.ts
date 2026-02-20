@@ -1,6 +1,6 @@
 import type { FastifyPluginCallback } from 'fastify'
 import sharp from 'sharp'
-import { badRequest } from '../lib/api-errors.js'
+import { badRequest, errorResponseSchema } from '../lib/api-errors.js'
 import { communityProfiles } from '../db/schema/community-profiles.js'
 
 const ALLOWED_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
@@ -11,13 +11,6 @@ const BANNER_SIZE = { width: 1500, height: 500 }
 // ---------------------------------------------------------------------------
 // OpenAPI JSON Schema definitions
 // ---------------------------------------------------------------------------
-
-const errorJsonSchema = {
-  type: 'object' as const,
-  properties: {
-    error: { type: 'string' as const },
-  },
-}
 
 const uploadResponseJsonSchema = {
   type: 'object' as const,
@@ -65,8 +58,8 @@ export function uploadRoutes(): FastifyPluginCallback {
           params: paramsJsonSchema,
           response: {
             200: uploadResponseJsonSchema,
-            400: errorJsonSchema,
-            401: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
           },
         },
       },
@@ -130,8 +123,8 @@ export function uploadRoutes(): FastifyPluginCallback {
           params: paramsJsonSchema,
           response: {
             200: uploadResponseJsonSchema,
-            400: errorJsonSchema,
-            401: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
           },
         },
       },

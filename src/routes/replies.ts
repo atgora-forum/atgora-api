@@ -2,7 +2,13 @@ import { eq, and, sql, asc, notInArray } from 'drizzle-orm'
 import type { FastifyPluginCallback } from 'fastify'
 import { getCommunityDid } from '../config/env.js'
 import { createPdsClient } from '../lib/pds-client.js'
-import { notFound, forbidden, badRequest } from '../lib/api-errors.js'
+import {
+  notFound,
+  forbidden,
+  badRequest,
+  errorResponseSchema,
+  sendError,
+} from '../lib/api-errors.js'
 import { resolveMaxMaturity, maturityAllows } from '../lib/content-filter.js'
 import type { MaturityUser } from '../lib/content-filter.js'
 import { loadBlockMuteLists } from '../lib/block-mute.js'
@@ -79,13 +85,6 @@ const replyJsonSchema = {
     ozoneLabel: { type: ['string', 'null'] as const },
     createdAt: { type: 'string' as const, format: 'date-time' as const },
     indexedAt: { type: 'string' as const, format: 'date-time' as const },
-  },
-}
-
-const errorJsonSchema = {
-  type: 'object' as const,
-  properties: {
-    error: { type: 'string' as const },
   },
 }
 
@@ -219,11 +218,12 @@ export function replyRoutes(): FastifyPluginCallback {
                 createdAt: { type: 'string', format: 'date-time' },
               },
             },
-            400: errorJsonSchema,
-            401: errorJsonSchema,
-            403: errorJsonSchema,
-            404: errorJsonSchema,
-            502: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
+            500: errorResponseSchema,
+            502: errorResponseSchema,
           },
         },
       },
@@ -331,11 +331,19 @@ export function replyRoutes(): FastifyPluginCallback {
           ...(labels ? { labels } : {}),
         }
 
+        // Write record to user's PDS
+        let pdsResult: { uri: string; cid: string }
         try {
-          // Write record to user's PDS
-          const result = await pdsClient.createRecord(user.did, COLLECTION, record)
-          const rkey = extractRkey(result.uri)
+          pdsResult = await pdsClient.createRecord(user.did, COLLECTION, record)
+        } catch (err: unknown) {
+          if (err instanceof Error && 'statusCode' in err) throw err
+          app.log.error({ err, did: user.did }, 'PDS write failed for reply creation')
+          return sendError(reply, 502, 'Failed to write to remote PDS')
+        }
 
+        const rkey = extractRkey(pdsResult.uri)
+
+        try {
           // Track repo if this is user's first post
           const repoManager = firehose.getRepoManager()
           const alreadyTracked = await repoManager.isTracked(user.did)
@@ -348,7 +356,7 @@ export function replyRoutes(): FastifyPluginCallback {
           await db
             .insert(replies)
             .values({
-              uri: result.uri,
+              uri: pdsResult.uri,
               rkey,
               authorDid: user.did,
               content,
@@ -357,7 +365,7 @@ export function replyRoutes(): FastifyPluginCallback {
               parentUri: parentRefUri,
               parentCid: parentRefCid,
               communityDid: topic.communityDid,
-              cid: result.cid,
+              cid: pdsResult.cid,
               labels: labels ?? null,
               reactionCount: 0,
               moderationStatus: contentModerationStatus,
@@ -369,7 +377,7 @@ export function replyRoutes(): FastifyPluginCallback {
               set: {
                 content,
                 labels: labels ?? null,
-                cid: result.cid,
+                cid: pdsResult.cid,
                 moderationStatus: contentModerationStatus,
                 indexedAt: new Date(),
               },
@@ -378,7 +386,7 @@ export function replyRoutes(): FastifyPluginCallback {
           // Insert moderation queue entries if held
           if (spamResult.held) {
             const queueEntries = spamResult.reasons.map((r) => ({
-              contentUri: result.uri,
+              contentUri: pdsResult.uri,
               contentType: 'reply' as const,
               authorDid: user.did,
               communityDid: topic.communityDid,
@@ -389,7 +397,7 @@ export function replyRoutes(): FastifyPluginCallback {
 
             app.log.info(
               {
-                replyUri: result.uri,
+                replyUri: pdsResult.uri,
                 reasons: spamResult.reasons.map((r) => r.reason),
                 authorDid: user.did,
               },
@@ -413,32 +421,35 @@ export function replyRoutes(): FastifyPluginCallback {
           if (!spamResult.held) {
             notificationService
               .notifyOnReply({
-                replyUri: result.uri,
+                replyUri: pdsResult.uri,
                 actorDid: user.did,
                 topicUri: decodedTopicUri,
                 parentUri: parentRefUri,
                 communityDid: topic.communityDid,
               })
               .catch((err: unknown) => {
-                app.log.error({ err, replyUri: result.uri }, 'Reply notification failed')
+                app.log.error({ err, replyUri: pdsResult.uri }, 'Reply notification failed')
               })
 
             notificationService
               .notifyOnMentions({
                 content,
-                subjectUri: result.uri,
+                subjectUri: pdsResult.uri,
                 actorDid: user.did,
                 communityDid: topic.communityDid,
               })
               .catch((err: unknown) => {
-                app.log.error({ err, replyUri: result.uri }, 'Mention notification failed')
+                app.log.error({ err, replyUri: pdsResult.uri }, 'Mention notification failed')
               })
 
             // Fire-and-forget: record interaction graph edges
             app.interactionGraphService
               .recordReply(user.did, topic.authorDid, topic.communityDid)
               .catch((err: unknown) => {
-                app.log.warn({ err, replyUri: result.uri }, 'Interaction graph recordReply failed')
+                app.log.warn(
+                  { err, replyUri: pdsResult.uri },
+                  'Interaction graph recordReply failed'
+                )
               })
 
             app.interactionGraphService
@@ -452,19 +463,17 @@ export function replyRoutes(): FastifyPluginCallback {
           }
 
           return await reply.status(201).send({
-            uri: result.uri,
-            cid: result.cid,
+            uri: pdsResult.uri,
+            cid: pdsResult.cid,
             rkey,
             content,
             moderationStatus: contentModerationStatus,
             createdAt: now,
           })
         } catch (err: unknown) {
-          if (err instanceof Error && 'statusCode' in err) {
-            throw err // Re-throw ApiError instances
-          }
+          if (err instanceof Error && 'statusCode' in err) throw err
           app.log.error({ err, did: user.did }, 'Failed to create reply')
-          return reply.status(502).send({ error: 'Failed to create reply' })
+          return sendError(reply, 500, 'Failed to save reply locally')
         }
       }
     )
@@ -503,8 +512,8 @@ export function replyRoutes(): FastifyPluginCallback {
                 cursor: { type: ['string', 'null'] },
               },
             },
-            400: errorJsonSchema,
-            404: errorJsonSchema,
+            400: errorResponseSchema,
+            404: errorResponseSchema,
           },
         },
       },
@@ -696,11 +705,12 @@ export function replyRoutes(): FastifyPluginCallback {
           },
           response: {
             200: replyJsonSchema,
-            400: errorJsonSchema,
-            401: errorJsonSchema,
-            403: errorJsonSchema,
-            404: errorJsonSchema,
-            502: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
+            500: errorResponseSchema,
+            502: errorResponseSchema,
           },
         },
       },
@@ -747,13 +757,21 @@ export function replyRoutes(): FastifyPluginCallback {
           ...(resolvedLabels ? { labels: resolvedLabels } : {}),
         }
 
+        // Update record on user's PDS
+        let pdsResult: { uri: string; cid: string }
         try {
-          const result = await pdsClient.updateRecord(user.did, COLLECTION, rkey, updatedRecord)
+          pdsResult = await pdsClient.updateRecord(user.did, COLLECTION, rkey, updatedRecord)
+        } catch (err: unknown) {
+          if (err instanceof Error && 'statusCode' in err) throw err
+          app.log.error({ err, uri: decodedUri }, 'PDS update failed for reply')
+          return sendError(reply, 502, 'Failed to update record on remote PDS')
+        }
 
+        try {
           // Build DB update set
           const dbUpdates: Record<string, unknown> = {
             content,
-            cid: result.cid,
+            cid: pdsResult.cid,
             indexedAt: new Date(),
           }
           if (labels !== undefined) dbUpdates.labels = labels
@@ -771,11 +789,9 @@ export function replyRoutes(): FastifyPluginCallback {
 
           return await reply.status(200).send(serializeReply(updatedRow))
         } catch (err: unknown) {
-          if (err instanceof Error && 'statusCode' in err) {
-            throw err // Re-throw ApiError instances
-          }
+          if (err instanceof Error && 'statusCode' in err) throw err
           app.log.error({ err, uri: decodedUri }, 'Failed to update reply')
-          return await reply.status(502).send({ error: 'Failed to update reply' })
+          return sendError(reply, 500, 'Failed to save reply update locally')
         }
       }
     )
@@ -801,10 +817,11 @@ export function replyRoutes(): FastifyPluginCallback {
           },
           response: {
             204: { type: 'null' },
-            401: errorJsonSchema,
-            403: errorJsonSchema,
-            404: errorJsonSchema,
-            502: errorJsonSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
+            500: errorResponseSchema,
+            502: errorResponseSchema,
           },
         },
       },
@@ -840,14 +857,19 @@ export function replyRoutes(): FastifyPluginCallback {
           throw forbidden('Not authorized to delete this reply')
         }
 
-        try {
-          // Author: delete from PDS AND DB
-          // Moderator: delete from DB only (leave record on PDS)
-          if (isAuthor) {
-            const rkey = extractRkey(decodedUri)
+        // Author: delete from PDS; moderator: skip PDS deletion
+        if (isAuthor) {
+          const rkey = extractRkey(decodedUri)
+          try {
             await pdsClient.deleteRecord(user.did, COLLECTION, rkey)
+          } catch (err: unknown) {
+            if (err instanceof Error && 'statusCode' in err) throw err
+            app.log.error({ err, uri: decodedUri }, 'PDS delete failed for reply')
+            return sendError(reply, 502, 'Failed to delete record from remote PDS')
           }
+        }
 
+        try {
           // Soft-delete reply and update topic replyCount in a transaction
           await db.transaction(async (tx) => {
             await tx
@@ -864,11 +886,9 @@ export function replyRoutes(): FastifyPluginCallback {
 
           return await reply.status(204).send()
         } catch (err: unknown) {
-          if (err instanceof Error && 'statusCode' in err) {
-            throw err
-          }
+          if (err instanceof Error && 'statusCode' in err) throw err
           app.log.error({ err, uri: decodedUri }, 'Failed to delete reply')
-          return await reply.status(502).send({ error: 'Failed to delete reply' })
+          return sendError(reply, 500, 'Failed to delete reply locally')
         }
       }
     )

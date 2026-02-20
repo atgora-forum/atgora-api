@@ -1,19 +1,12 @@
 import { eq } from 'drizzle-orm'
 import type { FastifyPluginCallback } from 'fastify'
-import { badRequest } from '../lib/api-errors.js'
+import { badRequest, errorResponseSchema } from '../lib/api-errors.js'
 import { didParamSchema } from '../validation/block-mute.js'
 import { userPreferences } from '../db/schema/user-preferences.js'
 
 // ---------------------------------------------------------------------------
 // OpenAPI JSON Schema definitions
 // ---------------------------------------------------------------------------
-
-const errorJsonSchema = {
-  type: 'object' as const,
-  properties: {
-    error: { type: 'string' as const },
-  },
-}
 
 const successJsonSchema = {
   type: 'object' as const,
@@ -61,8 +54,8 @@ export function blockMuteRoutes(): FastifyPluginCallback {
           params: didParamJsonSchema,
           response: {
             200: successJsonSchema,
-            400: errorJsonSchema,
-            401: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
           },
         },
       },
@@ -132,8 +125,8 @@ export function blockMuteRoutes(): FastifyPluginCallback {
           params: didParamJsonSchema,
           response: {
             200: successJsonSchema,
-            400: errorJsonSchema,
-            401: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
           },
         },
       },
@@ -197,8 +190,8 @@ export function blockMuteRoutes(): FastifyPluginCallback {
           params: didParamJsonSchema,
           response: {
             200: successJsonSchema,
-            400: errorJsonSchema,
-            401: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
           },
         },
       },
@@ -268,8 +261,8 @@ export function blockMuteRoutes(): FastifyPluginCallback {
           params: didParamJsonSchema,
           response: {
             200: successJsonSchema,
-            400: errorJsonSchema,
-            401: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
           },
         },
       },

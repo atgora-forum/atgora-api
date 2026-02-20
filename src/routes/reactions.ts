@@ -2,7 +2,14 @@ import { eq, and, sql, asc } from 'drizzle-orm'
 import type { FastifyPluginCallback } from 'fastify'
 import { getCommunityDid } from '../config/env.js'
 import { createPdsClient } from '../lib/pds-client.js'
-import { notFound, forbidden, badRequest, conflict } from '../lib/api-errors.js'
+import {
+  notFound,
+  forbidden,
+  badRequest,
+  conflict,
+  errorResponseSchema,
+  sendError,
+} from '../lib/api-errors.js'
 import { createReactionSchema, reactionQuerySchema } from '../validation/reactions.js'
 import { reactions } from '../db/schema/reactions.js'
 import { topics } from '../db/schema/topics.js'
@@ -34,13 +41,6 @@ const reactionJsonSchema = {
     type: { type: 'string' as const },
     cid: { type: 'string' as const },
     createdAt: { type: 'string' as const, format: 'date-time' as const },
-  },
-}
-
-const errorJsonSchema = {
-  type: 'object' as const,
-  properties: {
-    error: { type: 'string' as const },
   },
 }
 
@@ -148,12 +148,13 @@ export function reactionRoutes(): FastifyPluginCallback {
                 createdAt: { type: 'string', format: 'date-time' },
               },
             },
-            400: errorJsonSchema,
-            401: errorJsonSchema,
-            403: errorJsonSchema,
-            404: errorJsonSchema,
-            409: errorJsonSchema,
-            502: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
+            409: errorResponseSchema,
+            500: errorResponseSchema,
+            502: errorResponseSchema,
           },
         },
       },
@@ -231,11 +232,19 @@ export function reactionRoutes(): FastifyPluginCallback {
           createdAt: now,
         }
 
+        // Write record to user's PDS
+        let pdsResult: { uri: string; cid: string }
         try {
-          // Write record to user's PDS
-          const result = await pdsClient.createRecord(user.did, COLLECTION, record)
-          const rkey = extractRkey(result.uri)
+          pdsResult = await pdsClient.createRecord(user.did, COLLECTION, record)
+        } catch (err: unknown) {
+          if (err instanceof Error && 'statusCode' in err) throw err
+          app.log.error({ err, did: user.did }, 'PDS write failed for reaction creation')
+          return sendError(reply, 502, 'Failed to write to remote PDS')
+        }
 
+        const rkey = extractRkey(pdsResult.uri)
+
+        try {
           // Track repo if this is user's first interaction
           const repoManager = firehose.getRepoManager()
           const alreadyTracked = await repoManager.isTracked(user.did)
@@ -248,14 +257,14 @@ export function reactionRoutes(): FastifyPluginCallback {
             const inserted = await tx
               .insert(reactions)
               .values({
-                uri: result.uri,
+                uri: pdsResult.uri,
                 rkey,
                 authorDid: user.did,
                 subjectUri,
                 subjectCid,
                 type: reactionType,
                 communityDid,
-                cid: result.cid,
+                cid: pdsResult.cid,
                 createdAt: new Date(now),
                 indexedAt: new Date(),
               })
@@ -308,19 +317,17 @@ export function reactionRoutes(): FastifyPluginCallback {
           }
 
           return await reply.status(201).send({
-            uri: result.uri,
-            cid: result.cid,
+            uri: pdsResult.uri,
+            cid: pdsResult.cid,
             rkey,
             type: reactionType,
             subjectUri,
             createdAt: now,
           })
         } catch (err: unknown) {
-          if (err instanceof Error && 'statusCode' in err) {
-            throw err // Re-throw ApiError instances
-          }
+          if (err instanceof Error && 'statusCode' in err) throw err
           app.log.error({ err, did: user.did }, 'Failed to create reaction')
-          return reply.status(502).send({ error: 'Failed to create reaction' })
+          return sendError(reply, 500, 'Failed to save reaction locally')
         }
       }
     )
@@ -346,10 +353,11 @@ export function reactionRoutes(): FastifyPluginCallback {
           },
           response: {
             204: { type: 'null' },
-            401: errorJsonSchema,
-            403: errorJsonSchema,
-            404: errorJsonSchema,
-            502: errorJsonSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
+            500: errorResponseSchema,
+            502: errorResponseSchema,
           },
         },
       },
@@ -381,10 +389,16 @@ export function reactionRoutes(): FastifyPluginCallback {
 
         const rkey = extractRkey(decodedUri)
 
+        // Delete from PDS
         try {
-          // Delete from PDS
           await pdsClient.deleteRecord(user.did, COLLECTION, rkey)
+        } catch (err: unknown) {
+          if (err instanceof Error && 'statusCode' in err) throw err
+          app.log.error({ err, uri: decodedUri }, 'PDS delete failed for reaction')
+          return sendError(reply, 502, 'Failed to delete record from remote PDS')
+        }
 
+        try {
           // In transaction: delete from DB + decrement count on subject
           await db.transaction(async (tx) => {
             await tx
@@ -412,11 +426,9 @@ export function reactionRoutes(): FastifyPluginCallback {
 
           return await reply.status(204).send()
         } catch (err: unknown) {
-          if (err instanceof Error && 'statusCode' in err) {
-            throw err
-          }
+          if (err instanceof Error && 'statusCode' in err) throw err
           app.log.error({ err, uri: decodedUri }, 'Failed to delete reaction')
-          return await reply.status(502).send({ error: 'Failed to delete reaction' })
+          return sendError(reply, 500, 'Failed to delete reaction locally')
         }
       }
     )
@@ -450,7 +462,7 @@ export function reactionRoutes(): FastifyPluginCallback {
                 cursor: { type: ['string', 'null'] },
               },
             },
-            400: errorJsonSchema,
+            400: errorResponseSchema,
           },
         },
       },

@@ -1,7 +1,7 @@
 import { eq, and, desc, sql } from 'drizzle-orm'
 import type { FastifyPluginCallback } from 'fastify'
 import { getCommunityDid } from '../config/env.js'
-import { notFound, badRequest, conflict } from '../lib/api-errors.js'
+import { notFound, badRequest, conflict, errorResponseSchema } from '../lib/api-errors.js'
 import { wordFilterSchema, queueActionSchema, queueQuerySchema } from '../validation/anti-spam.js'
 import { moderationQueue } from '../db/schema/moderation-queue.js'
 import { accountTrust } from '../db/schema/account-trust.js'
@@ -13,13 +13,6 @@ import { createRequireModerator } from '../auth/require-moderator.js'
 // ---------------------------------------------------------------------------
 // OpenAPI JSON Schema definitions
 // ---------------------------------------------------------------------------
-
-const errorJsonSchema = {
-  type: 'object' as const,
-  properties: {
-    error: { type: 'string' as const },
-  },
-}
 
 const queueItemJsonSchema = {
   type: 'object' as const,
@@ -124,7 +117,7 @@ export function moderationQueueRoutes(): FastifyPluginCallback {
                 cursor: { type: ['string', 'null'] },
               },
             },
-            400: errorJsonSchema,
+            400: errorResponseSchema,
           },
         },
       },
@@ -206,11 +199,11 @@ export function moderationQueueRoutes(): FastifyPluginCallback {
           },
           response: {
             200: queueItemJsonSchema,
-            400: errorJsonSchema,
-            401: errorJsonSchema,
-            403: errorJsonSchema,
-            404: errorJsonSchema,
-            409: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
+            409: errorResponseSchema,
           },
         },
       },
@@ -455,7 +448,7 @@ export function moderationQueueRoutes(): FastifyPluginCallback {
                 },
               },
             },
-            400: errorJsonSchema,
+            400: errorResponseSchema,
           },
         },
       },
