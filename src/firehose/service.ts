@@ -99,7 +99,15 @@ export class FirehoseService {
       })
 
       this.channel = this.tap.channel(indexer)
-      await this.channel.start()
+
+      // channel.start() is a long-running loop over WebSocket messages that
+      // only resolves when the channel is destroyed. Run it as a background
+      // task so it does not block the Fastify onReady hook.
+      this.channel.start().catch((err: unknown) => {
+        this.logger.error({ err }, 'Firehose channel error')
+        this.connected = false
+      })
+
       this.connected = true
       this.logger.info('Firehose subscription started')
     } catch (err) {
