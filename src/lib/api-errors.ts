@@ -6,6 +6,59 @@
 // code and a structured message for consistent API responses.
 // ---------------------------------------------------------------------------
 
+import type { FastifyReply } from 'fastify'
+
+// ---------------------------------------------------------------------------
+// Shared OpenAPI error response schema
+// ---------------------------------------------------------------------------
+// All route files should import this instead of defining their own.
+// Matches the shape sent by the global error handler in app.ts and the
+// sendError helper below: { error, message, statusCode }.
+// ---------------------------------------------------------------------------
+
+export const errorResponseSchema = {
+  type: 'object' as const,
+  properties: {
+    error: { type: 'string' as const },
+    message: { type: 'string' as const },
+    statusCode: { type: 'integer' as const },
+  },
+}
+
+// ---------------------------------------------------------------------------
+// HTTP status text lookup
+// ---------------------------------------------------------------------------
+
+const HTTP_STATUS_TEXTS: Record<number, string> = {
+  400: 'Bad Request',
+  401: 'Unauthorized',
+  403: 'Forbidden',
+  404: 'Not Found',
+  409: 'Conflict',
+  429: 'Too Many Requests',
+  500: 'Internal Server Error',
+  502: 'Bad Gateway',
+}
+
+// ---------------------------------------------------------------------------
+// Structured error response helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Send a structured error response with consistent shape: { error, message, statusCode }.
+ *
+ * - `error`      – HTTP status text (e.g. "Bad Gateway")
+ * - `message`    – human-readable description of the failure
+ * - `statusCode` – numeric HTTP status code
+ */
+export function sendError(reply: FastifyReply, statusCode: number, message: string) {
+  return reply.status(statusCode).send({
+    error: HTTP_STATUS_TEXTS[statusCode] ?? 'Error',
+    message,
+    statusCode,
+  })
+}
+
 /**
  * Base API error with an HTTP status code.
  * Fastify uses `statusCode` on thrown errors to set the response status.

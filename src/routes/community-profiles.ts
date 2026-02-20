@@ -1,6 +1,6 @@
 import { eq, and } from 'drizzle-orm'
 import type { FastifyPluginCallback } from 'fastify'
-import { notFound, badRequest } from '../lib/api-errors.js'
+import { notFound, badRequest, errorResponseSchema } from '../lib/api-errors.js'
 import { resolveProfile } from '../lib/resolve-profile.js'
 import type { SourceProfile, CommunityOverride } from '../lib/resolve-profile.js'
 import { updateCommunityProfileSchema } from '../validation/community-profiles.js'
@@ -10,13 +10,6 @@ import { communityProfiles } from '../db/schema/community-profiles.js'
 // ---------------------------------------------------------------------------
 // OpenAPI JSON Schema definitions
 // ---------------------------------------------------------------------------
-
-const errorJsonSchema = {
-  type: 'object' as const,
-  properties: {
-    error: { type: 'string' as const },
-  },
-}
 
 const communityProfileJsonSchema = {
   type: 'object' as const,
@@ -84,8 +77,8 @@ export function communityProfileRoutes(): FastifyPluginCallback {
           },
           response: {
             200: communityProfileJsonSchema,
-            401: errorJsonSchema,
-            404: errorJsonSchema,
+            401: errorResponseSchema,
+            404: errorResponseSchema,
           },
         },
       },
@@ -186,8 +179,8 @@ export function communityProfileRoutes(): FastifyPluginCallback {
           },
           response: {
             200: successJsonSchema,
-            400: errorJsonSchema,
-            401: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
           },
         },
       },
@@ -253,7 +246,7 @@ export function communityProfileRoutes(): FastifyPluginCallback {
           },
           response: {
             204: { type: 'null' },
-            401: errorJsonSchema,
+            401: errorResponseSchema,
           },
         },
       },

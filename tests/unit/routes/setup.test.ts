@@ -145,7 +145,7 @@ describe('setup routes', () => {
       })
     })
 
-    it('returns 502 when service throws', async () => {
+    it('returns 500 when service throws', async () => {
       getStatusFn.mockRejectedValueOnce(new Error('DB down'))
 
       const response = await app.inject({
@@ -153,8 +153,11 @@ describe('setup routes', () => {
         url: '/api/setup/status',
       })
 
-      expect(response.statusCode).toBe(502)
-      expect(response.json<{ error: string }>().error).toBe('Service temporarily unavailable')
+      expect(response.statusCode).toBe(500)
+      const body = response.json<{ error: string; message: string; statusCode: number }>()
+      expect(body.error).toBe('Internal Server Error')
+      expect(body.message).toBe('Service temporarily unavailable')
+      expect(body.statusCode).toBe(500)
     })
   })
 
@@ -376,7 +379,7 @@ describe('setup routes', () => {
       expect(response.json<{ error: string }>().error).toBe('Invalid request body')
     })
 
-    it('returns 502 when service throws', async () => {
+    it('returns 500 when service throws', async () => {
       validateAccessTokenFn.mockResolvedValueOnce(makeMockSession())
       initializeFn.mockRejectedValueOnce(new Error('DB down'))
 
@@ -389,8 +392,11 @@ describe('setup routes', () => {
         payload: {},
       })
 
-      expect(response.statusCode).toBe(502)
-      expect(response.json<{ error: string }>().error).toBe('Service temporarily unavailable')
+      expect(response.statusCode).toBe(500)
+      const body = response.json<{ error: string; message: string; statusCode: number }>()
+      expect(body.error).toBe('Internal Server Error')
+      expect(body.message).toBe('Service temporarily unavailable')
+      expect(body.statusCode).toBe(500)
     })
   })
 })

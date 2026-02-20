@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm'
 import type { FastifyPluginCallback } from 'fastify'
 import { getCommunityDid } from '../config/env.js'
-import { badRequest } from '../lib/api-errors.js'
+import { badRequest, errorResponseSchema } from '../lib/api-errors.js'
 import { loadMutedWords, contentMatchesMutedWords } from '../lib/muted-words.js'
 import { createEmbeddingService } from '../services/embedding.js'
 import { searchQuerySchema } from '../validation/search.js'
@@ -29,13 +29,6 @@ const searchResultJsonSchema = {
     rootUri: { type: ['string', 'null'] as const },
     rootTitle: { type: ['string', 'null'] as const },
     isMutedWord: { type: 'boolean' as const },
-  },
-}
-
-const errorJsonSchema = {
-  type: 'object' as const,
-  properties: {
-    error: { type: 'string' as const },
   },
 }
 
@@ -238,7 +231,7 @@ export function searchRoutes(): FastifyPluginCallback {
                 },
               },
             },
-            400: errorJsonSchema,
+            400: errorResponseSchema,
           },
         },
       },

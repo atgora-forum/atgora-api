@@ -1,6 +1,6 @@
 import { eq, sql } from 'drizzle-orm'
 import type { FastifyPluginCallback } from 'fastify'
-import { notFound, badRequest } from '../lib/api-errors.js'
+import { notFound, badRequest, errorResponseSchema } from '../lib/api-errors.js'
 import { isMaturityLowerThan } from '../lib/maturity.js'
 import { updateSettingsSchema } from '../validation/admin-settings.js'
 import { communitySettings } from '../db/schema/community-settings.js'
@@ -29,15 +29,6 @@ const settingsJsonSchema = {
     requireLoginForMature: { type: 'boolean' as const },
     createdAt: { type: 'string' as const, format: 'date-time' as const },
     updatedAt: { type: 'string' as const, format: 'date-time' as const },
-  },
-}
-
-const errorJsonSchema = {
-  type: 'object' as const,
-  properties: {
-    error: { type: 'string' as const },
-    message: { type: 'string' as const },
-    statusCode: { type: 'integer' as const },
   },
 }
 
@@ -143,7 +134,7 @@ export function adminSettingsRoutes(): FastifyPluginCallback {
                 communityLogoUrl: { type: ['string', 'null'] as const },
               },
             },
-            404: errorJsonSchema,
+            404: errorResponseSchema,
           },
         },
       },
@@ -182,9 +173,9 @@ export function adminSettingsRoutes(): FastifyPluginCallback {
           security: [{ bearerAuth: [] }],
           response: {
             200: settingsJsonSchema,
-            401: errorJsonSchema,
-            403: errorJsonSchema,
-            404: errorJsonSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
           },
         },
       },
@@ -242,10 +233,10 @@ export function adminSettingsRoutes(): FastifyPluginCallback {
           },
           response: {
             200: settingsJsonSchema,
-            400: errorJsonSchema,
-            401: errorJsonSchema,
-            403: errorJsonSchema,
-            404: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
             409: conflictJsonSchema,
           },
         },
@@ -400,8 +391,8 @@ export function adminSettingsRoutes(): FastifyPluginCallback {
           security: [{ bearerAuth: [] }],
           response: {
             200: statsJsonSchema,
-            401: errorJsonSchema,
-            403: errorJsonSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
           },
         },
       },

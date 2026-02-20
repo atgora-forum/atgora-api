@@ -1,5 +1,6 @@
 import { z } from 'zod/v4'
 import type { FastifyPluginCallback } from 'fastify'
+import { sendError } from '../lib/api-errors.js'
 
 // ---------------------------------------------------------------------------
 // Zod schemas for request validation
@@ -38,9 +39,7 @@ export function setupRoutes(): FastifyPluginCallback {
         return await reply.status(200).send(status)
       } catch (err: unknown) {
         app.log.error({ err }, 'Failed to get setup status')
-        return await reply.status(502).send({
-          error: 'Service temporarily unavailable',
-        })
+        return sendError(reply, 500, 'Service temporarily unavailable')
       }
     })
 
@@ -81,9 +80,7 @@ export function setupRoutes(): FastifyPluginCallback {
           return await reply.status(200).send(result)
         } catch (err: unknown) {
           app.log.error({ err }, 'Failed to initialize community')
-          return await reply.status(502).send({
-            error: 'Service temporarily unavailable',
-          })
+          return sendError(reply, 500, 'Service temporarily unavailable')
         }
       }
     )

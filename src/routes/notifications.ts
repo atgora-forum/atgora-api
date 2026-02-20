@@ -1,6 +1,6 @@
 import { eq, and, sql, desc } from 'drizzle-orm'
 import type { FastifyPluginCallback } from 'fastify'
-import { badRequest } from '../lib/api-errors.js'
+import { badRequest, errorResponseSchema } from '../lib/api-errors.js'
 import { notificationQuerySchema, markReadSchema } from '../validation/notifications.js'
 import { notifications } from '../db/schema/notifications.js'
 
@@ -18,13 +18,6 @@ const notificationJsonSchema = {
     communityDid: { type: 'string' as const },
     read: { type: 'boolean' as const },
     createdAt: { type: 'string' as const, format: 'date-time' as const },
-  },
-}
-
-const errorJsonSchema = {
-  type: 'object' as const,
-  properties: {
-    error: { type: 'string' as const },
   },
 }
 
@@ -120,8 +113,8 @@ export function notificationRoutes(): FastifyPluginCallback {
                 total: { type: 'number' },
               },
             },
-            400: errorJsonSchema,
-            401: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
           },
         },
       },
@@ -222,8 +215,8 @@ export function notificationRoutes(): FastifyPluginCallback {
                 success: { type: 'boolean' },
               },
             },
-            400: errorJsonSchema,
-            401: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
           },
         },
       },
@@ -283,7 +276,7 @@ export function notificationRoutes(): FastifyPluginCallback {
                 unread: { type: 'number' },
               },
             },
-            401: errorJsonSchema,
+            401: errorResponseSchema,
           },
         },
       },

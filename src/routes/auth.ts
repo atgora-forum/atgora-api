@@ -2,6 +2,7 @@ import { z } from 'zod/v4'
 import { eq } from 'drizzle-orm'
 import type { FastifyPluginCallback } from 'fastify'
 import type { NodeOAuthClient } from '@atproto/oauth-client-node'
+import { sendError } from '../lib/api-errors.js'
 import {
   BARAZO_BASE_SCOPES,
   BARAZO_CROSSPOST_SCOPES,
@@ -93,7 +94,7 @@ export function authRoutes(oauthClient: NodeOAuthClient): FastifyPluginCallback 
           return await reply.status(200).send({ url: redirectUrl.toString() })
         } catch (err: unknown) {
           app.log.error({ err, handle }, 'OAuth authorize failed')
-          return await reply.status(502).send({ error: 'Failed to initiate login' })
+          return sendError(reply, 502, 'Failed to initiate login')
         }
       }
     )
@@ -216,9 +217,7 @@ export function authRoutes(oauthClient: NodeOAuthClient): FastifyPluginCallback 
           return await reply.status(200).send({ url: redirectUrl.toString() })
         } catch (err: unknown) {
           app.log.error({ err, handle: session.handle }, 'Cross-post authorize failed')
-          return await reply
-            .status(502)
-            .send({ error: 'Failed to initiate cross-post authorization' })
+          return sendError(reply, 502, 'Failed to initiate cross-post authorization')
         }
       }
     )
@@ -265,7 +264,7 @@ export function authRoutes(oauthClient: NodeOAuthClient): FastifyPluginCallback 
         })
       } catch (err: unknown) {
         app.log.error({ err }, 'Session refresh failed')
-        return reply.status(502).send({ error: 'Service temporarily unavailable' })
+        return sendError(reply, 500, 'Service temporarily unavailable')
       }
     })
 
@@ -283,7 +282,7 @@ export function authRoutes(oauthClient: NodeOAuthClient): FastifyPluginCallback 
         await sessionService.deleteSession(sid)
       } catch (err: unknown) {
         app.log.error({ err }, 'Session deletion failed')
-        return reply.status(502).send({ error: 'Service temporarily unavailable' })
+        return sendError(reply, 500, 'Service temporarily unavailable')
       }
 
       // Clear the cookie
@@ -323,7 +322,7 @@ export function authRoutes(oauthClient: NodeOAuthClient): FastifyPluginCallback 
         })
       } catch (err: unknown) {
         app.log.error({ err }, 'Token validation failed')
-        return reply.status(502).send({ error: 'Service temporarily unavailable' })
+        return sendError(reply, 500, 'Service temporarily unavailable')
       }
     })
 

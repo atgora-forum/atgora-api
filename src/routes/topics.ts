@@ -2,7 +2,13 @@ import { eq, and, desc, sql, inArray, notInArray, isNotNull, ne, or } from 'driz
 import type { FastifyPluginCallback } from 'fastify'
 import { getCommunityDid } from '../config/env.js'
 import { createPdsClient } from '../lib/pds-client.js'
-import { notFound, forbidden, badRequest } from '../lib/api-errors.js'
+import {
+  notFound,
+  forbidden,
+  badRequest,
+  errorResponseSchema,
+  sendError,
+} from '../lib/api-errors.js'
 import { resolveMaxMaturity, allowedRatings, maturityAllows } from '../lib/content-filter.js'
 import type { MaturityUser } from '../lib/content-filter.js'
 import { createTopicSchema, updateTopicSchema, topicQuerySchema } from '../validation/topics.js'
@@ -81,13 +87,6 @@ const topicJsonSchema = {
     lastActivityAt: { type: 'string' as const, format: 'date-time' as const },
     createdAt: { type: 'string' as const, format: 'date-time' as const },
     indexedAt: { type: 'string' as const, format: 'date-time' as const },
-  },
-}
-
-const errorJsonSchema = {
-  type: 'object' as const,
-  properties: {
-    error: { type: 'string' as const },
   },
 }
 
@@ -231,10 +230,11 @@ export function topicRoutes(): FastifyPluginCallback {
                 createdAt: { type: 'string', format: 'date-time' },
               },
             },
-            400: errorJsonSchema,
-            401: errorJsonSchema,
-            403: errorJsonSchema,
-            502: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
+            500: errorResponseSchema,
+            502: errorResponseSchema,
           },
         },
       },
@@ -354,11 +354,19 @@ export function topicRoutes(): FastifyPluginCallback {
           ...(labels ? { labels } : {}),
         }
 
+        // Write record to user's PDS
+        let pdsResult: { uri: string; cid: string }
         try {
-          // Write record to user's PDS
-          const result = await pdsClient.createRecord(user.did, COLLECTION, record)
-          const rkey = extractRkey(result.uri)
+          pdsResult = await pdsClient.createRecord(user.did, COLLECTION, record)
+        } catch (err: unknown) {
+          if (err instanceof Error && 'statusCode' in err) throw err
+          app.log.error({ err, did: user.did }, 'PDS write failed for topic creation')
+          return sendError(reply, 502, 'Failed to write to remote PDS')
+        }
 
+        const rkey = extractRkey(pdsResult.uri)
+
+        try {
           // Track repo if this is user's first post
           const repoManager = firehose.getRepoManager()
           const alreadyTracked = await repoManager.isTracked(user.did)
@@ -371,7 +379,7 @@ export function topicRoutes(): FastifyPluginCallback {
           await db
             .insert(topics)
             .values({
-              uri: result.uri,
+              uri: pdsResult.uri,
               rkey,
               authorDid: user.did,
               title,
@@ -380,7 +388,7 @@ export function topicRoutes(): FastifyPluginCallback {
               tags: tags ?? [],
               labels: labels ?? null,
               communityDid,
-              cid: result.cid,
+              cid: pdsResult.cid,
               replyCount: 0,
               reactionCount: 0,
               moderationStatus: contentModerationStatus,
@@ -396,7 +404,7 @@ export function topicRoutes(): FastifyPluginCallback {
                 category,
                 tags: tags ?? [],
                 labels: labels ?? null,
-                cid: result.cid,
+                cid: pdsResult.cid,
                 moderationStatus: contentModerationStatus,
                 indexedAt: new Date(),
               },
@@ -405,7 +413,7 @@ export function topicRoutes(): FastifyPluginCallback {
           // Insert moderation queue entries if held
           if (spamResult.held) {
             const queueEntries = spamResult.reasons.map((r) => ({
-              contentUri: result.uri,
+              contentUri: pdsResult.uri,
               contentType: 'topic' as const,
               authorDid: user.did,
               communityDid,
@@ -416,7 +424,7 @@ export function topicRoutes(): FastifyPluginCallback {
 
             app.log.info(
               {
-                topicUri: result.uri,
+                topicUri: pdsResult.uri,
                 reasons: spamResult.reasons.map((r) => r.reason),
                 authorDid: user.did,
               },
@@ -433,14 +441,14 @@ export function topicRoutes(): FastifyPluginCallback {
             crossPostService
               .crossPostTopic({
                 did: user.did,
-                topicUri: result.uri,
+                topicUri: pdsResult.uri,
                 title,
                 content,
                 category,
                 communityDid,
               })
               .catch((err: unknown) => {
-                app.log.error({ err, topicUri: result.uri }, 'Cross-posting failed')
+                app.log.error({ err, topicUri: pdsResult.uri }, 'Cross-posting failed')
               })
           }
 
@@ -449,18 +457,18 @@ export function topicRoutes(): FastifyPluginCallback {
             notificationService
               .notifyOnMentions({
                 content,
-                subjectUri: result.uri,
+                subjectUri: pdsResult.uri,
                 actorDid: user.did,
                 communityDid,
               })
               .catch((err: unknown) => {
-                app.log.error({ err, topicUri: result.uri }, 'Mention notification failed')
+                app.log.error({ err, topicUri: pdsResult.uri }, 'Mention notification failed')
               })
           }
 
           return await reply.status(201).send({
-            uri: result.uri,
-            cid: result.cid,
+            uri: pdsResult.uri,
+            cid: pdsResult.cid,
             rkey,
             title,
             category,
@@ -468,8 +476,9 @@ export function topicRoutes(): FastifyPluginCallback {
             createdAt: now,
           })
         } catch (err: unknown) {
+          if (err instanceof Error && 'statusCode' in err) throw err
           app.log.error({ err, did: user.did }, 'Failed to create topic')
-          return reply.status(502).send({ error: 'Failed to create topic' })
+          return sendError(reply, 500, 'Failed to save topic locally')
         }
       }
     )
@@ -503,7 +512,7 @@ export function topicRoutes(): FastifyPluginCallback {
                 cursor: { type: ['string', 'null'] },
               },
             },
-            400: errorJsonSchema,
+            400: errorResponseSchema,
           },
         },
       },
@@ -761,8 +770,8 @@ export function topicRoutes(): FastifyPluginCallback {
           },
           response: {
             200: topicJsonSchema,
-            403: errorJsonSchema,
-            404: errorJsonSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
           },
         },
       },
@@ -829,8 +838,8 @@ export function topicRoutes(): FastifyPluginCallback {
           },
           response: {
             200: topicJsonSchema,
-            403: errorJsonSchema,
-            404: errorJsonSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
           },
         },
       },
@@ -932,11 +941,12 @@ export function topicRoutes(): FastifyPluginCallback {
           },
           response: {
             200: topicJsonSchema,
-            400: errorJsonSchema,
-            401: errorJsonSchema,
-            403: errorJsonSchema,
-            404: errorJsonSchema,
-            502: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
+            500: errorResponseSchema,
+            502: errorResponseSchema,
           },
         },
       },
@@ -985,12 +995,20 @@ export function topicRoutes(): FastifyPluginCallback {
           ...(resolvedLabels ? { labels: resolvedLabels } : {}),
         }
 
+        // Update record on user's PDS
+        let pdsResult: { uri: string; cid: string }
         try {
-          const result = await pdsClient.updateRecord(user.did, COLLECTION, rkey, updatedRecord)
+          pdsResult = await pdsClient.updateRecord(user.did, COLLECTION, rkey, updatedRecord)
+        } catch (err: unknown) {
+          if (err instanceof Error && 'statusCode' in err) throw err
+          app.log.error({ err, uri: decodedUri }, 'PDS update failed for topic')
+          return sendError(reply, 502, 'Failed to update record on remote PDS')
+        }
 
+        try {
           // Build DB update set
           const dbUpdates: Record<string, unknown> = {
-            cid: result.cid,
+            cid: pdsResult.cid,
             indexedAt: new Date(),
           }
           if (updates.title !== undefined) dbUpdates.title = updates.title
@@ -1012,11 +1030,9 @@ export function topicRoutes(): FastifyPluginCallback {
 
           return await reply.status(200).send(serializeTopic(updatedRow))
         } catch (err: unknown) {
-          if (err instanceof Error && 'statusCode' in err) {
-            throw err // Re-throw ApiError instances
-          }
+          if (err instanceof Error && 'statusCode' in err) throw err
           app.log.error({ err, uri: decodedUri }, 'Failed to update topic')
-          return await reply.status(502).send({ error: 'Failed to update topic' })
+          return sendError(reply, 500, 'Failed to save topic update locally')
         }
       }
     )
@@ -1042,10 +1058,11 @@ export function topicRoutes(): FastifyPluginCallback {
           },
           response: {
             204: { type: 'null' },
-            401: errorJsonSchema,
-            403: errorJsonSchema,
-            404: errorJsonSchema,
-            502: errorJsonSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
+            500: errorResponseSchema,
+            502: errorResponseSchema,
           },
         },
       },
@@ -1081,14 +1098,19 @@ export function topicRoutes(): FastifyPluginCallback {
           throw forbidden('Not authorized to delete this topic')
         }
 
-        try {
-          // Author: delete from PDS AND DB
-          // Moderator: delete from DB only (leave record on PDS)
-          if (isAuthor) {
-            const rkey = extractRkey(decodedUri)
+        // Author: delete from PDS; moderator: skip PDS deletion
+        if (isAuthor) {
+          const rkey = extractRkey(decodedUri)
+          try {
             await pdsClient.deleteRecord(user.did, COLLECTION, rkey)
+          } catch (err: unknown) {
+            if (err instanceof Error && 'statusCode' in err) throw err
+            app.log.error({ err, uri: decodedUri }, 'PDS delete failed for topic')
+            return sendError(reply, 502, 'Failed to delete record from remote PDS')
           }
+        }
 
+        try {
           // Best-effort cross-post deletion (fire-and-forget)
           crossPostService.deleteCrossPosts(decodedUri, user.did).catch((err: unknown) => {
             app.log.warn({ err, topicUri: decodedUri }, 'Failed to delete cross-posts')
@@ -1099,11 +1121,9 @@ export function topicRoutes(): FastifyPluginCallback {
 
           return await reply.status(204).send()
         } catch (err: unknown) {
-          if (err instanceof Error && 'statusCode' in err) {
-            throw err
-          }
+          if (err instanceof Error && 'statusCode' in err) throw err
           app.log.error({ err, uri: decodedUri }, 'Failed to delete topic')
-          return await reply.status(502).send({ error: 'Failed to delete topic' })
+          return sendError(reply, 500, 'Failed to delete topic locally')
         }
       }
     )

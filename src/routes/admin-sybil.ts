@@ -1,6 +1,6 @@
 import { eq, and, desc, sql, count } from 'drizzle-orm'
 import type { FastifyPluginCallback } from 'fastify'
-import { notFound, badRequest, tooManyRequests } from '../lib/api-errors.js'
+import { notFound, badRequest, tooManyRequests, errorResponseSchema } from '../lib/api-errors.js'
 import {
   trustSeedCreateSchema,
   trustSeedQuerySchema,
@@ -23,13 +23,6 @@ import { pdsTrustFactors } from '../db/schema/pds-trust-factors.js'
 // ---------------------------------------------------------------------------
 // OpenAPI JSON Schema definitions
 // ---------------------------------------------------------------------------
-
-const errorJsonSchema = {
-  type: 'object' as const,
-  properties: {
-    error: { type: 'string' as const },
-  },
-}
 
 const trustSeedJsonSchema = {
   type: 'object' as const,
@@ -240,7 +233,7 @@ export function adminSybilRoutes(): FastifyPluginCallback {
                 cursor: { type: ['string', 'null'] },
               },
             },
-            400: errorJsonSchema,
+            400: errorResponseSchema,
           },
         },
       },
@@ -347,10 +340,10 @@ export function adminSybilRoutes(): FastifyPluginCallback {
           },
           response: {
             201: trustSeedJsonSchema,
-            400: errorJsonSchema,
-            401: errorJsonSchema,
-            403: errorJsonSchema,
-            404: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
           },
         },
       },
@@ -428,8 +421,8 @@ export function adminSybilRoutes(): FastifyPluginCallback {
           },
           response: {
             204: { type: 'null' as const },
-            400: errorJsonSchema,
-            404: errorJsonSchema,
+            400: errorResponseSchema,
+            404: errorResponseSchema,
           },
         },
       },
@@ -493,7 +486,7 @@ export function adminSybilRoutes(): FastifyPluginCallback {
                 cursor: { type: ['string', 'null'] },
               },
             },
-            400: errorJsonSchema,
+            400: errorResponseSchema,
           },
         },
       },
@@ -593,8 +586,8 @@ export function adminSybilRoutes(): FastifyPluginCallback {
                 },
               },
             },
-            400: errorJsonSchema,
-            404: errorJsonSchema,
+            400: errorResponseSchema,
+            404: errorResponseSchema,
           },
         },
       },
@@ -674,10 +667,10 @@ export function adminSybilRoutes(): FastifyPluginCallback {
           },
           response: {
             200: sybilClusterJsonSchema,
-            400: errorJsonSchema,
-            401: errorJsonSchema,
-            403: errorJsonSchema,
-            404: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
           },
         },
       },
@@ -786,7 +779,7 @@ export function adminSybilRoutes(): FastifyPluginCallback {
                 cursor: { type: ['string', 'null'] },
               },
             },
-            400: errorJsonSchema,
+            400: errorResponseSchema,
           },
         },
       },
@@ -858,7 +851,7 @@ export function adminSybilRoutes(): FastifyPluginCallback {
           },
           response: {
             200: pdsTrustJsonSchema,
-            400: errorJsonSchema,
+            400: errorResponseSchema,
           },
         },
       },
@@ -924,7 +917,7 @@ export function adminSybilRoutes(): FastifyPluginCallback {
                 startedAt: { type: 'string', format: 'date-time' },
               },
             },
-            429: errorJsonSchema,
+            429: errorResponseSchema,
           },
         },
       },
@@ -1071,7 +1064,7 @@ export function adminSybilRoutes(): FastifyPluginCallback {
                 cursor: { type: ['string', 'null'] },
               },
             },
-            400: errorJsonSchema,
+            400: errorResponseSchema,
           },
         },
       },
@@ -1153,8 +1146,8 @@ export function adminSybilRoutes(): FastifyPluginCallback {
           },
           response: {
             200: behavioralFlagJsonSchema,
-            400: errorJsonSchema,
-            404: errorJsonSchema,
+            400: errorResponseSchema,
+            404: errorResponseSchema,
           },
         },
       },

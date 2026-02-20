@@ -1,6 +1,6 @@
 import { eq, and, desc, sql } from 'drizzle-orm'
 import type { FastifyPluginCallback } from 'fastify'
-import { badRequest } from '../lib/api-errors.js'
+import { badRequest, errorResponseSchema } from '../lib/api-errors.js'
 import {
   communityFilterQuerySchema,
   updateCommunityFilterSchema,
@@ -14,13 +14,6 @@ import { accountFilters } from '../db/schema/account-filters.js'
 // ---------------------------------------------------------------------------
 // OpenAPI JSON Schema definitions
 // ---------------------------------------------------------------------------
-
-const errorJsonSchema = {
-  type: 'object' as const,
-  properties: {
-    error: { type: 'string' as const },
-  },
-}
 
 const communityFilterJsonSchema = {
   type: 'object' as const,
@@ -147,9 +140,9 @@ export function globalFilterRoutes(): FastifyPluginCallback {
                 cursor: { type: ['string', 'null'] },
               },
             },
-            400: errorJsonSchema,
-            403: errorJsonSchema,
-            404: errorJsonSchema,
+            400: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
           },
         },
       },
@@ -231,9 +224,9 @@ export function globalFilterRoutes(): FastifyPluginCallback {
           },
           response: {
             200: communityFilterJsonSchema,
-            400: errorJsonSchema,
-            403: errorJsonSchema,
-            404: errorJsonSchema,
+            400: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
           },
         },
       },
@@ -316,9 +309,9 @@ export function globalFilterRoutes(): FastifyPluginCallback {
                 cursor: { type: ['string', 'null'] },
               },
             },
-            400: errorJsonSchema,
-            403: errorJsonSchema,
-            404: errorJsonSchema,
+            400: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
           },
         },
       },
@@ -403,9 +396,9 @@ export function globalFilterRoutes(): FastifyPluginCallback {
           },
           response: {
             200: accountFilterJsonSchema,
-            400: errorJsonSchema,
-            403: errorJsonSchema,
-            404: errorJsonSchema,
+            400: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
           },
         },
       },
@@ -491,9 +484,9 @@ export function globalFilterRoutes(): FastifyPluginCallback {
                 },
               },
             },
-            400: errorJsonSchema,
-            403: errorJsonSchema,
-            404: errorJsonSchema,
+            400: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
           },
         },
       },

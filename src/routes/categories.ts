@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { eq, and, count } from 'drizzle-orm'
 import type { FastifyPluginCallback } from 'fastify'
 import { getCommunityDid } from '../config/env.js'
-import { notFound, badRequest, conflict } from '../lib/api-errors.js'
+import { notFound, badRequest, conflict, errorResponseSchema } from '../lib/api-errors.js'
 import { isMaturityLowerThan } from '../lib/maturity.js'
 import {
   createCategorySchema,
@@ -157,15 +157,6 @@ const categoryWithTopicCountJsonSchema = {
   },
 }
 
-const errorJsonSchema = {
-  type: 'object' as const,
-  properties: {
-    error: { type: 'string' as const },
-    message: { type: 'string' as const },
-    statusCode: { type: 'integer' as const },
-  },
-}
-
 // ---------------------------------------------------------------------------
 // Category routes plugin
 // ---------------------------------------------------------------------------
@@ -256,7 +247,7 @@ export function categoryRoutes(): FastifyPluginCallback {
           },
           response: {
             200: categoryWithTopicCountJsonSchema,
-            404: errorJsonSchema,
+            404: errorResponseSchema,
           },
         },
       },
@@ -315,10 +306,10 @@ export function categoryRoutes(): FastifyPluginCallback {
           },
           response: {
             201: categoryJsonSchema,
-            400: errorJsonSchema,
-            401: errorJsonSchema,
-            403: errorJsonSchema,
-            409: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
+            409: errorResponseSchema,
           },
         },
       },
@@ -429,11 +420,11 @@ export function categoryRoutes(): FastifyPluginCallback {
           },
           response: {
             200: categoryJsonSchema,
-            400: errorJsonSchema,
-            401: errorJsonSchema,
-            403: errorJsonSchema,
-            404: errorJsonSchema,
-            409: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
+            409: errorResponseSchema,
           },
         },
       },
@@ -569,10 +560,10 @@ export function categoryRoutes(): FastifyPluginCallback {
           },
           response: {
             204: { type: 'null' },
-            401: errorJsonSchema,
-            403: errorJsonSchema,
-            404: errorJsonSchema,
-            409: errorJsonSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
+            409: errorResponseSchema,
           },
         },
       },
@@ -650,10 +641,10 @@ export function categoryRoutes(): FastifyPluginCallback {
           },
           response: {
             200: categoryJsonSchema,
-            400: errorJsonSchema,
-            401: errorJsonSchema,
-            403: errorJsonSchema,
-            404: errorJsonSchema,
+            400: errorResponseSchema,
+            401: errorResponseSchema,
+            403: errorResponseSchema,
+            404: errorResponseSchema,
           },
         },
       },
