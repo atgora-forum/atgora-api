@@ -46,6 +46,7 @@ import type { SetupService } from './setup/service.js'
 import { createPlcDidService } from './services/plc-did.js'
 import { createHandleResolver } from './lib/handle-resolver.js'
 import type { HandleResolver } from './lib/handle-resolver.js'
+import { createDidDocumentVerifier } from './lib/did-document-verifier.js'
 import { createProfileSyncService } from './services/profile-sync.js'
 import type { ProfileSyncService } from './services/profile-sync.js'
 import { createLocalStorage } from './lib/storage.js'
@@ -171,9 +172,12 @@ export async function buildApp(env: Env) {
   })
   app.decorate('sessionService', sessionService)
 
+  // DID document verifier (checks DID is still active via PLC directory, cached in Valkey)
+  const didVerifier = createDidDocumentVerifier(cache, app.log)
+
   // Auth middleware (request decoration must happen before hooks can set the property)
   app.decorateRequest('user', undefined as RequestUser | undefined)
-  const authMiddleware = createAuthMiddleware(sessionService, app.log)
+  const authMiddleware = createAuthMiddleware(sessionService, didVerifier, app.log)
   app.decorate('authMiddleware', authMiddleware)
 
   // Handle resolver (DID -> handle, with cache)

@@ -1,5 +1,6 @@
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import type { SessionService } from './session.js'
+import type { DidDocumentVerifier, DidVerificationResult } from '../lib/did-document-verifier.js'
 import type { Logger } from '../lib/logger.js'
 
 // ---------------------------------------------------------------------------
@@ -52,29 +53,32 @@ function extractBearerToken(request: FastifyRequest): string | undefined {
   return token
 }
 
+/** Check if a DID verification failure is a transient resolution error. */
+function isResolutionFailure(result: DidVerificationResult): boolean {
+  return !result.active && result.reason === 'DID document resolution failed'
+}
+
 // ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------
-
-// TODO(self-hosting): Add DID document verification with 1-hour cache TTL. (#37)
-// Currently trusts the DID from the session. Full verification requires
-// PLC directory / DNS resolution (see standards/backend.md).
-// Not needed for single-instance MVP (trusted Valkey on same host).
 
 /**
  * Create auth middleware hooks for Fastify route preHandler.
  *
  * @param sessionService - Session service for token validation
+ * @param didVerifier - DID document verifier for checking DID status
  * @param logger - Pino logger instance
  * @returns Object with requireAuth and optionalAuth hooks
  */
 export function createAuthMiddleware(
   sessionService: SessionService,
+  didVerifier: DidDocumentVerifier,
   logger: Logger
 ): AuthMiddleware {
   /**
    * Require authentication. Returns 401 if no valid token, 502 if service error.
    * On success, sets `request.user` with the authenticated user info.
+   * Verifies the DID document is still active via the PLC directory (cached).
    */
   async function requireAuth(request: FastifyRequest, reply: FastifyReply): Promise<void> {
     const token = extractBearerToken(request)
@@ -87,6 +91,21 @@ export function createAuthMiddleware(
       const session = await sessionService.validateAccessToken(token)
       if (!session) {
         await reply.status(401).send({ error: 'Invalid or expired token' })
+        return
+      }
+
+      // Verify DID document is still active
+      const didResult = await didVerifier.verify(session.did)
+      if (!didResult.active) {
+        if (isResolutionFailure(didResult)) {
+          // Transient failure with no cached data -- fail closed
+          logger.error({ did: session.did, reason: didResult.reason }, 'DID verification failed')
+          await reply.status(502).send({ error: 'Service temporarily unavailable' })
+        } else {
+          // DID is definitively deactivated/tombstoned/not found
+          logger.warn({ did: session.did, reason: didResult.reason }, 'DID is no longer active')
+          await reply.status(401).send({ error: 'DID is no longer active' })
+        }
         return
       }
 
@@ -103,7 +122,8 @@ export function createAuthMiddleware(
 
   /**
    * Optional authentication. If a valid token is present, sets `request.user`.
-   * If no token, invalid token, or service error: continues with `request.user` undefined.
+   * If no token, invalid token, DID inactive, or service error: continues
+   * with `request.user` undefined.
    */
   async function optionalAuth(request: FastifyRequest, _reply: FastifyReply): Promise<void> {
     const token = extractBearerToken(request)
@@ -113,12 +133,24 @@ export function createAuthMiddleware(
 
     try {
       const session = await sessionService.validateAccessToken(token)
-      if (session) {
-        request.user = {
-          did: session.did,
-          handle: session.handle,
-          sid: session.sid,
-        }
+      if (!session) {
+        return
+      }
+
+      // Verify DID document is still active
+      const didResult = await didVerifier.verify(session.did)
+      if (!didResult.active) {
+        logger.warn(
+          { did: session.did, reason: didResult.reason },
+          'DID verification failed in optionalAuth, continuing unauthenticated'
+        )
+        return
+      }
+
+      request.user = {
+        did: session.did,
+        handle: session.handle,
+        sid: session.sid,
       }
     } catch (err: unknown) {
       logger.warn({ err }, 'Token validation failed in optionalAuth, continuing unauthenticated')

@@ -73,8 +73,10 @@ describe('setup routes', () => {
       silent: vi.fn(),
       level: 'silent',
     }
+    const mockDidVerifier = { verify: vi.fn().mockResolvedValue({ active: true }) }
     const authMiddleware: AuthMiddleware = createAuthMiddleware(
       mockSessionService,
+      mockDidVerifier,
       mockLogger as never
     )
 
