@@ -1,8 +1,3 @@
-/**
- * Commitlint configuration
- * Conventional Commits enforced per CLAUDE.md
- * @see https://commitlint.js.org/#/reference-configuration
- */
 export default {
   extends: ['@commitlint/config-conventional'],
   rules: {
@@ -25,7 +20,6 @@ export default {
         'security',
       ],
     ],
-    'scope-empty': [0],
     'subject-case': [0],
   },
 }
