@@ -9,17 +9,17 @@ The AppView backend for Barazo. Subscribes to AT Protocol firehose, indexes `for
 
 ## Tech Stack
 
-| Component  | Technology                                             |
-| ---------- | ------------------------------------------------------ |
-| Runtime    | Node.js 24 LTS / TypeScript (strict)                   |
-| Framework  | Fastify                                                |
-| Protocol   | @atproto/api, @atproto/oauth-client-node, @atproto/tap |
-| Database   | PostgreSQL 16 (Drizzle ORM, Drizzle Kit migrations)    |
-| Cache      | Valkey                                                 |
-| Testing    | Vitest + Supertest                                     |
-| Logging    | Pino (structured)                                      |
-| Monitoring | GlitchTip (Sentry SDK-compatible)                      |
-| Security   | Helmet + Zod + DOMPurify + rate limiting               |
+| Component | Technology |
+|-----------|-----------|
+| Runtime | Node.js 24 LTS / TypeScript (strict) |
+| Framework | Fastify |
+| Protocol | @atproto/api, @atproto/oauth-client-node, @atproto/tap |
+| Database | PostgreSQL 16 (Drizzle ORM, Drizzle Kit push) |
+| Cache | Valkey |
+| Testing | Vitest + Supertest |
+| Logging | Pino (structured) |
+| Monitoring | GlitchTip (Sentry SDK-compatible) |
+| Security | Helmet + Zod + DOMPurify + rate limiting |
 
 ## What This Repo Does
 
@@ -62,7 +62,7 @@ Open-source forum software built on the [AT Protocol](https://atproto.com/). Por
 6. **Output sanitization** -- DOMPurify on all user-generated content.
 7. **No raw SQL** -- Drizzle ORM with parameterized queries only.
 8. **Structured logging** -- Pino logger, never `console.log`.
-9. **Accessible error responses** -- API responses include human-readable error messages that support accessible frontend rendering.
+9. **Accessibility** -- WCAG 2.2 AA, semantic HTML, keyboard navigable.
 
 ### Git Workflow
 
