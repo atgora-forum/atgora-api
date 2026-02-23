@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { requireCommunityDid } from '../middleware/community-resolver.js'
 import { eq, and, count } from 'drizzle-orm'
 import type { FastifyPluginCallback } from 'fastify'
 import { notFound, badRequest, conflict, errorResponseSchema } from '../lib/api-errors.js'
@@ -175,7 +176,7 @@ const categoryWithTopicCountJsonSchema = {
  */
 export function categoryRoutes(): FastifyPluginCallback {
   return (app, _opts, done) => {
-    const { db, env, authMiddleware, requireAdmin } = app
+    const { db, authMiddleware, requireAdmin } = app
 
     // -------------------------------------------------------------------
     // GET /api/categories (public, optionalAuth)
@@ -208,7 +209,7 @@ export function categoryRoutes(): FastifyPluginCallback {
       async (request, reply) => {
         const parsed = categoryQuerySchema.safeParse(request.query)
         const parentId = parsed.success ? parsed.data.parentId : undefined
-        const communityDid = request.communityDid
+        const communityDid = requireCommunityDid(request)
 
         const conditions = [eq(categories.communityDid, communityDid)]
         if (parentId !== undefined) {
@@ -252,7 +253,7 @@ export function categoryRoutes(): FastifyPluginCallback {
       },
       async (request, reply) => {
         const { slug } = request.params as { slug: string }
-        const communityDid = request.communityDid
+        const communityDid = requireCommunityDid(request)
 
         const rows = await db
           .select()
@@ -319,13 +320,13 @@ export function categoryRoutes(): FastifyPluginCallback {
         }
 
         const { name, slug, description, parentId, sortOrder, maturityRating } = parsed.data
-        const communityDid = request.communityDid
+        const communityDid = requireCommunityDid(request)
 
         // Fetch community settings for maturity default
         const settingsRows = await db
           .select()
           .from(communitySettings)
-          .where(eq(communitySettings.id, 'default'))
+          .where(eq(communitySettings.communityDid, communityDid))
 
         const settings = settingsRows[0]
         const communityDefault = settings?.maturityRating ?? 'safe'
@@ -444,13 +445,13 @@ export function categoryRoutes(): FastifyPluginCallback {
         }
 
         const updates = parsed.data
-        const communityDid = request.communityDid
+        const communityDid = requireCommunityDid(request)
 
         // Fetch community settings for maturity validation
         const settingsRows = await db
           .select()
           .from(communitySettings)
-          .where(eq(communitySettings.id, 'default'))
+          .where(eq(communitySettings.communityDid, communityDid))
 
         const settings = settingsRows[0]
         const communityDefault = settings?.maturityRating ?? 'safe'
@@ -578,7 +579,7 @@ export function categoryRoutes(): FastifyPluginCallback {
         }
 
         // Check if category has topics within this community
-        const communityDid = request.communityDid
+        const communityDid = requireCommunityDid(request)
         const topicCountResult = await db
           .select({ count: count() })
           .from(topics)
@@ -648,6 +649,7 @@ export function categoryRoutes(): FastifyPluginCallback {
         },
       },
       async (request, reply) => {
+        const communityDid = requireCommunityDid(request)
         const { id } = request.params as { id: string }
 
         const parsed = updateMaturitySchema.safeParse(request.body)
@@ -669,7 +671,7 @@ export function categoryRoutes(): FastifyPluginCallback {
         const settingsRows = await db
           .select()
           .from(communitySettings)
-          .where(eq(communitySettings.id, 'default'))
+          .where(eq(communitySettings.communityDid, communityDid))
 
         const settings = settingsRows[0]
         const communityDefault = settings?.maturityRating ?? 'safe'

@@ -1,4 +1,5 @@
 import { eq, and, asc } from 'drizzle-orm'
+import { requireCommunityDid } from '../middleware/community-resolver.js'
 import type { FastifyPluginCallback } from 'fastify'
 import { notFound, badRequest, forbidden, errorResponseSchema } from '../lib/api-errors.js'
 import {
@@ -77,7 +78,7 @@ function serializeField(row: typeof communityOnboardingFields.$inferSelect) {
 
 export function onboardingRoutes(): FastifyPluginCallback {
   return (app, _opts, done) => {
-    const { db, authMiddleware, env } = app
+    const { db, authMiddleware } = app
     const requireAdmin = app.requireAdmin
 
     // =====================================================================
@@ -106,8 +107,8 @@ export function onboardingRoutes(): FastifyPluginCallback {
           },
         },
       },
-      async (_request, reply) => {
-        const communityDid = request.communityDid
+      async (request, reply) => {
+        const communityDid = requireCommunityDid(request)
 
         const fields = await db
           .select()
@@ -157,7 +158,7 @@ export function onboardingRoutes(): FastifyPluginCallback {
           throw badRequest('Invalid onboarding field data')
         }
 
-        const communityDid = request.communityDid
+        const communityDid = requireCommunityDid(request)
 
         const inserted = await db
           .insert(communityOnboardingFields)
@@ -239,7 +240,7 @@ export function onboardingRoutes(): FastifyPluginCallback {
           throw badRequest('At least one field must be provided')
         }
 
-        const communityDid = request.communityDid
+        const communityDid = requireCommunityDid(request)
 
         const dbUpdates: Record<string, unknown> = { updatedAt: new Date() }
         if (updates.label !== undefined) dbUpdates.label = updates.label
@@ -297,7 +298,7 @@ export function onboardingRoutes(): FastifyPluginCallback {
         },
       },
       async (request, reply) => {
-        const communityDid = request.communityDid
+        const communityDid = requireCommunityDid(request)
 
         const deleted = await db
           .delete(communityOnboardingFields)
@@ -367,7 +368,7 @@ export function onboardingRoutes(): FastifyPluginCallback {
           throw badRequest('Invalid reorder data')
         }
 
-        const communityDid = request.communityDid
+        const communityDid = requireCommunityDid(request)
 
         // Update each field's sort order
         for (const item of parsed.data) {
@@ -421,7 +422,7 @@ export function onboardingRoutes(): FastifyPluginCallback {
           throw forbidden('Authentication required')
         }
 
-        const communityDid = request.communityDid
+        const communityDid = requireCommunityDid(request)
 
         // Get all fields for this community
         const fields = await db
@@ -505,7 +506,7 @@ export function onboardingRoutes(): FastifyPluginCallback {
           throw badRequest('Invalid submission data')
         }
 
-        const communityDid = request.communityDid
+        const communityDid = requireCommunityDid(request)
 
         // Fetch all community fields to validate against
         const fields = await db

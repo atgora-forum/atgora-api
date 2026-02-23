@@ -1,4 +1,5 @@
 import { eq, and, sql } from 'drizzle-orm'
+import { requireCommunityDid } from '../middleware/community-resolver.js'
 import type { FastifyPluginCallback } from 'fastify'
 import { createPdsClient } from '../lib/pds-client.js'
 import {
@@ -40,7 +41,7 @@ const ALLOWED_DIRECTIONS = ['up']
  */
 export function voteRoutes(): FastifyPluginCallback {
   return (app, _opts, done) => {
-    const { db, env, authMiddleware, firehose } = app
+    const { db, authMiddleware, firehose } = app
     const pdsClient = createPdsClient(app.oauthClient, app.log)
 
     // -------------------------------------------------------------------
@@ -98,7 +99,7 @@ export function voteRoutes(): FastifyPluginCallback {
         }
 
         const { subjectUri, subjectCid, direction } = parsed.data
-        const communityDid = request.communityDid
+        const communityDid = requireCommunityDid(request)
 
         // Validate direction
         if (!ALLOWED_DIRECTIONS.includes(direction)) {
@@ -265,7 +266,7 @@ export function voteRoutes(): FastifyPluginCallback {
 
         const { uri } = request.params as { uri: string }
         const decodedUri = decodeURIComponent(uri)
-        const communityDid = request.communityDid
+        const communityDid = requireCommunityDid(request)
 
         // Fetch existing vote (scoped to this community)
         const existing = await db
@@ -374,7 +375,7 @@ export function voteRoutes(): FastifyPluginCallback {
         }
 
         const { subjectUri, did } = parsed.data
-        const communityDid = request.communityDid
+        const communityDid = requireCommunityDid(request)
 
         const rows = await db
           .select({

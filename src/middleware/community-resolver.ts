@@ -1,4 +1,5 @@
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyRequest } from 'fastify'
+import { badRequest } from '../lib/api-errors.js'
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -8,6 +9,18 @@ declare module 'fastify' {
 
 export interface CommunityResolver {
   resolve(hostname: string): Promise<string | undefined>
+}
+
+/**
+ * Extract communityDid from request, throwing 400 if not set.
+ * Use in route handlers that require a community context (most write operations).
+ */
+export function requireCommunityDid(request: FastifyRequest): string {
+  const { communityDid } = request
+  if (!communityDid) {
+    throw badRequest('Community context required')
+  }
+  return communityDid
 }
 
 export function createSingleResolver(communityDid: string): CommunityResolver {

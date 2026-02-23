@@ -33,9 +33,9 @@ export function setupRoutes(): FastifyPluginCallback {
     // GET /api/setup/status (public, no auth required)
     // -------------------------------------------------------------------
 
-    app.get('/api/setup/status', async (_request, reply) => {
+    app.get('/api/setup/status', async (request, reply) => {
       try {
-        const status = await setupService.getStatus()
+        const status = await setupService.getStatus(request.communityDid ?? '')
         return await reply.status(200).send(status)
       } catch (err: unknown) {
         app.log.error({ err }, 'Failed to get setup status')
@@ -65,6 +65,7 @@ export function setupRoutes(): FastifyPluginCallback {
 
         try {
           const result = await setupService.initialize({
+            communityDid: request.communityDid ?? '',
             did: user.did,
             communityName: parsed.data.communityName,
             handle: parsed.data.handle,

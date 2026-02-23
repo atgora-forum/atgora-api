@@ -1,4 +1,5 @@
 import { eq, and, sql, asc, notInArray } from 'drizzle-orm'
+import { requireCommunityDid } from '../middleware/community-resolver.js'
 import type { FastifyPluginCallback } from 'fastify'
 import { createPdsClient } from '../lib/pds-client.js'
 import {
@@ -541,7 +542,7 @@ export function replyRoutes(): FastifyPluginCallback {
         }
 
         // Maturity check: verify the topic's category is within the user's allowed level
-        const communityDid = request.communityDid
+        const communityDid = requireCommunityDid(request)
         const catRows = await db
           .select({ maturityRating: categories.maturityRating })
           .from(categories)
@@ -573,7 +574,7 @@ export function replyRoutes(): FastifyPluginCallback {
         const replySettingsRows = await db
           .select({ ageThreshold: communitySettings.ageThreshold })
           .from(communitySettings)
-          .where(eq(communitySettings.id, 'default'))
+          .where(eq(communitySettings.communityDid, communityDid))
         const replyAgeThreshold = replySettingsRows[0]?.ageThreshold ?? 16
 
         const maxMaturity = resolveMaxMaturity(userProfile, replyAgeThreshold)

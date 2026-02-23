@@ -1,4 +1,5 @@
 import { eq, and, sql, asc } from 'drizzle-orm'
+import { requireCommunityDid } from '../middleware/community-resolver.js'
 import type { FastifyPluginCallback } from 'fastify'
 import { createPdsClient } from '../lib/pds-client.js'
 import {
@@ -101,7 +102,7 @@ function decodeCursor(cursor: string): { createdAt: string; uri: string } | null
  */
 export function reactionRoutes(): FastifyPluginCallback {
   return (app, _opts, done) => {
-    const { db, env, authMiddleware, firehose } = app
+    const { db, authMiddleware, firehose } = app
     const pdsClient = createPdsClient(app.oauthClient, app.log)
     const notificationService = createNotificationService(db, app.log)
 
@@ -160,7 +161,7 @@ export function reactionRoutes(): FastifyPluginCallback {
         }
 
         const { subjectUri, subjectCid, type: reactionType } = parsed.data
-        const communityDid = request.communityDid
+        const communityDid = requireCommunityDid(request)
 
         // Onboarding gate: block if user hasn't completed mandatory onboarding
         const onboarding = await checkOnboardingComplete(db, user.did, communityDid)
@@ -175,7 +176,7 @@ export function reactionRoutes(): FastifyPluginCallback {
         const settingsRows = await db
           .select({ reactionSet: communitySettings.reactionSet })
           .from(communitySettings)
-          .where(eq(communitySettings.id, 'default'))
+          .where(eq(communitySettings.communityDid, communityDid))
 
         const settings = settingsRows[0]
         const reactionSet: string[] = settings?.reactionSet ?? ['like']
@@ -359,7 +360,7 @@ export function reactionRoutes(): FastifyPluginCallback {
 
         const { uri } = request.params as { uri: string }
         const decodedUri = decodeURIComponent(uri)
-        const communityDid = request.communityDid
+        const communityDid = requireCommunityDid(request)
 
         // Fetch existing reaction (scoped to this community)
         const existing = await db
@@ -463,7 +464,7 @@ export function reactionRoutes(): FastifyPluginCallback {
         }
 
         const { subjectUri, type: reactionType, cursor, limit } = parsed.data
-        const communityDid = request.communityDid
+        const communityDid = requireCommunityDid(request)
         const conditions = [
           eq(reactions.subjectUri, subjectUri),
           eq(reactions.communityDid, communityDid),
