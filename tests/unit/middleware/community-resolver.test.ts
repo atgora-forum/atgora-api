@@ -42,14 +42,12 @@ describe('CommunityResolver', () => {
 
       const response = await app.inject({ method: 'GET', url: '/test' })
       expect(response.statusCode).toBe(200)
-      expect(response.json<{ communityDid: string }>().communityDid).toBe(
-        'did:plc:singlecommunity'
-      )
+      expect(response.json<{ communityDid: string }>().communityDid).toBe('did:plc:singlecommunity')
     })
 
     it('returns 404 in single mode when resolver returns undefined', async () => {
       // Construct a resolver that returns undefined (shouldn't happen in single mode, but safety net)
-      const resolver: CommunityResolver = { resolve: async () => undefined }
+      const resolver: CommunityResolver = { resolve: () => Promise.resolve(undefined) }
 
       app = Fastify({ logger: false })
       registerCommunityResolver(app, resolver, 'single')
@@ -65,7 +63,7 @@ describe('CommunityResolver', () => {
     })
 
     it('allows undefined communityDid in multi mode (aggregator)', async () => {
-      const resolver: CommunityResolver = { resolve: async () => undefined }
+      const resolver: CommunityResolver = { resolve: () => Promise.resolve(undefined) }
 
       app = Fastify({ logger: false })
       registerCommunityResolver(app, resolver, 'multi')

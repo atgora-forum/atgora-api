@@ -244,8 +244,9 @@ async function buildTestApp(user?: RequestUser): Promise<FastifyInstance> {
   app.decorate('cache', {} as never)
   app.decorateRequest('user', undefined as RequestUser | undefined)
   app.decorateRequest('communityDid', undefined as string | undefined)
-  app.addHook('onRequest', async (request) => {
+  app.addHook('onRequest', (request, _reply, done) => {
     request.communityDid = 'did:plc:test'
+    done()
   })
 
   await app.register(topicRoutes())
@@ -1514,8 +1515,9 @@ describe('topic routes', () => {
       globalApp.decorate('cache', {} as never)
       globalApp.decorateRequest('user', undefined as RequestUser | undefined)
       globalApp.decorateRequest('communityDid', undefined as string | undefined)
-      globalApp.addHook('onRequest', async (request) => {
+      globalApp.addHook('onRequest', (request, _reply, done) => {
         request.communityDid = 'did:plc:test'
+        done()
       })
 
       await globalApp.register(topicRoutes())
@@ -2103,8 +2105,9 @@ describe('topic routes', () => {
       crossPostApp.decorate('cache', {} as never)
       crossPostApp.decorateRequest('user', undefined as RequestUser | undefined)
       crossPostApp.decorateRequest('communityDid', undefined as string | undefined)
-      crossPostApp.addHook('onRequest', async (request) => {
+      crossPostApp.addHook('onRequest', (request, _reply, done) => {
         request.communityDid = 'did:plc:test'
+        done()
       })
       await crossPostApp.register(topicRoutes())
       await crossPostApp.ready()
@@ -2230,8 +2233,9 @@ describe('topic routes', () => {
       } as never)
       ozoneApp.decorateRequest('user', undefined as RequestUser | undefined)
       ozoneApp.decorateRequest('communityDid', undefined as string | undefined)
-      ozoneApp.addHook('onRequest', async (request) => {
+      ozoneApp.addHook('onRequest', (request, _reply, done) => {
         request.communityDid = 'did:plc:test'
+        done()
       })
       await ozoneApp.register(topicRoutes())
       await ozoneApp.ready()
@@ -2359,8 +2363,9 @@ describe('topic routes', () => {
       } as never)
       ozoneApp.decorateRequest('user', undefined as RequestUser | undefined)
       ozoneApp.decorateRequest('communityDid', undefined as string | undefined)
-      ozoneApp.addHook('onRequest', async (request) => {
+      ozoneApp.addHook('onRequest', (request, _reply, done) => {
         request.communityDid = 'did:plc:test'
+        done()
       })
       await ozoneApp.register(topicRoutes())
       await ozoneApp.ready()
@@ -3242,8 +3247,9 @@ describe('topic routes', () => {
       globalApp.decorate('cache', {} as never)
       globalApp.decorateRequest('user', undefined as RequestUser | undefined)
       globalApp.decorateRequest('communityDid', undefined as string | undefined)
-      globalApp.addHook('onRequest', async (request) => {
+      globalApp.addHook('onRequest', (request, _reply, done) => {
         request.communityDid = 'did:plc:test'
+        done()
       })
 
       await globalApp.register(topicRoutes())

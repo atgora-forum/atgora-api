@@ -571,12 +571,13 @@ export function topicRoutes(): FastifyPluginCallback {
           // Filter: NEVER show adult communities in global mode,
           // check mature communities against user's max maturity preference
           const allowedCommunityDids = communityRows
-            .filter((c) => {
-              if (!c.communityDid) return false
-              if (c.maturityRating === 'adult') return false
-              return maturityAllows(maxMaturity, c.maturityRating)
-            })
-            .map((c) => c.communityDid as string)
+            .filter(
+              (c): c is typeof c & { communityDid: string } =>
+                !!c.communityDid &&
+                c.maturityRating !== 'adult' &&
+                maturityAllows(maxMaturity, c.maturityRating)
+            )
+            .map((c) => c.communityDid)
 
           if (allowedCommunityDids.length === 0) {
             return reply.status(200).send({ topics: [], cursor: null })
@@ -719,7 +720,7 @@ export function topicRoutes(): FastifyPluginCallback {
         // Batch-resolve author profiles
         const authorMap = await resolveAuthors(
           serialized.map((t) => t.authorDid),
-          communityDid ?? null,
+          communityDid,
           db
         )
 

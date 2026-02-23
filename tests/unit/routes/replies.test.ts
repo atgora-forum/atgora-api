@@ -303,8 +303,9 @@ async function buildTestApp(
   }
   app.decorateRequest('user', undefined as RequestUser | undefined)
   app.decorateRequest('communityDid', undefined as string | undefined)
-  app.addHook('onRequest', async (request) => {
+  app.addHook('onRequest', (request, _reply, done) => {
     request.communityDid = 'did:plc:test'
+    done()
   })
 
   await app.register(replyRoutes())

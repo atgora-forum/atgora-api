@@ -12,10 +12,7 @@ import type { NodeOAuthClient } from '@atproto/oauth-client-node'
 import { sql } from 'drizzle-orm'
 import type { Env } from './config/env.js'
 import { getCommunityDid } from './config/env.js'
-import {
-  createSingleResolver,
-  registerCommunityResolver,
-} from './middleware/community-resolver.js'
+import { createSingleResolver, registerCommunityResolver } from './middleware/community-resolver.js'
 import type { CommunityResolver } from './middleware/community-resolver.js'
 import { createDb } from './db/index.js'
 import { createCache } from './cache/index.js'
@@ -173,8 +170,9 @@ export async function buildApp(env: Env) {
   let resolver: CommunityResolver
   if (env.COMMUNITY_MODE === 'multi') {
     try {
-      const { createMultiResolver } = await import('@barazo/multi-tenant')
-      resolver = createMultiResolver(db, cache)
+      const mod = await import('@barazo/multi-tenant')
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      resolver = mod.createMultiResolver(db, cache)
     } catch {
       throw new Error(
         'COMMUNITY_MODE is "multi" but @barazo/multi-tenant package is not installed. ' +

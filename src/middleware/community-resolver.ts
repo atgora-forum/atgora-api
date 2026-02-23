@@ -24,7 +24,7 @@ export function requireCommunityDid(request: FastifyRequest): string {
 }
 
 export function createSingleResolver(communityDid: string): CommunityResolver {
-  return { resolve: async () => communityDid }
+  return { resolve: () => Promise.resolve(communityDid) }
 }
 
 export function registerCommunityResolver(

@@ -87,8 +87,9 @@ describe('setup routes', () => {
     // Fastify requires decoration before hooks can set properties
     app.decorateRequest('user', undefined as RequestUser | undefined)
     app.decorateRequest('communityDid', undefined as string | undefined)
-    app.addHook('onRequest', async (request) => {
+    app.addHook('onRequest', (request, _reply, done) => {
       request.communityDid = 'did:plc:test'
+      done()
     })
 
     // Register setup routes

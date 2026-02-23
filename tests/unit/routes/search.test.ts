@@ -95,8 +95,9 @@ async function buildTestApp(): Promise<FastifyInstance> {
 
   app.decorateRequest('user', undefined as RequestUser | undefined)
   app.decorateRequest('communityDid', undefined as string | undefined)
-  app.addHook('onRequest', async (request) => {
+  app.addHook('onRequest', (request, _reply, done) => {
     request.communityDid = 'did:plc:test'
+    done()
   })
   app.decorate('db', mockDb as never)
   app.decorate('env', {
@@ -1373,8 +1374,9 @@ describe('search routes', () => {
 
     authApp.decorateRequest('user', undefined as RequestUser | undefined)
     authApp.decorateRequest('communityDid', undefined as string | undefined)
-    authApp.addHook('onRequest', async (request) => {
+    authApp.addHook('onRequest', (request, _reply, done) => {
       request.communityDid = 'did:plc:test'
+      done()
     })
     authApp.decorate('db', mockDb as never)
     authApp.decorate('env', {

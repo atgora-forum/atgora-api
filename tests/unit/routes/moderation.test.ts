@@ -276,8 +276,9 @@ async function buildTestApp(
   app.decorate('cache', {} as never)
   app.decorateRequest('user', undefined as RequestUser | undefined)
   app.decorateRequest('communityDid', undefined as string | undefined)
-  app.addHook('onRequest', async (request) => {
+  app.addHook('onRequest', (request, _reply, done) => {
     request.communityDid = 'did:plc:test'
+    done()
   })
 
   await app.register(moderationRoutes())
@@ -316,8 +317,9 @@ async function buildPassthroughAuthApp(): Promise<FastifyInstance> {
   app.decorate('cache', {} as never)
   app.decorateRequest('user', undefined as RequestUser | undefined)
   app.decorateRequest('communityDid', undefined as string | undefined)
-  app.addHook('onRequest', async (request) => {
+  app.addHook('onRequest', (request, _reply, done) => {
     request.communityDid = 'did:plc:test'
+    done()
   })
 
   await app.register(moderationRoutes())
@@ -1688,8 +1690,9 @@ describe('moderation routes', () => {
       } as never)
       app.decorateRequest('user', undefined as RequestUser | undefined)
       app.decorateRequest('communityDid', undefined as string | undefined)
-      app.addHook('onRequest', async (request) => {
+      app.addHook('onRequest', (request, _reply, done) => {
         request.communityDid = 'did:plc:test'
+        done()
       })
 
       await app.register(moderationRoutes())
@@ -1944,8 +1947,9 @@ describe('moderation routes', () => {
       app.decorate('cache', {} as never)
       app.decorateRequest('user', undefined as RequestUser | undefined)
       app.decorateRequest('communityDid', undefined as string | undefined)
-      app.addHook('onRequest', async (request) => {
+      app.addHook('onRequest', (request, _reply, done) => {
         request.communityDid = 'did:plc:test'
+        done()
       })
 
       await app.register(moderationRoutes())
