@@ -86,6 +86,11 @@ describe('setup routes', () => {
 
     // Fastify requires decoration before hooks can set properties
     app.decorateRequest('user', undefined as RequestUser | undefined)
+    app.decorateRequest('communityDid', undefined as string | undefined)
+    app.addHook('onRequest', (request, _reply, done) => {
+      request.communityDid = 'did:plc:test'
+      done()
+    })
 
     // Register setup routes
     await app.register(setupRoutes())
@@ -204,6 +209,7 @@ describe('setup routes', () => {
         communityName: 'Barazo Community',
       })
       expect(initializeFn).toHaveBeenCalledWith({
+        communityDid: 'did:plc:test',
         did: TEST_DID,
         communityName: undefined,
         handle: undefined,
@@ -253,6 +259,7 @@ describe('setup routes', () => {
         communityName: 'Custom Forum Name',
       })
       expect(initializeFn).toHaveBeenCalledWith({
+        communityDid: 'did:plc:test',
         did: TEST_DID,
         communityName: 'Custom Forum Name',
         handle: undefined,
@@ -336,6 +343,7 @@ describe('setup routes', () => {
 
       expect(response.statusCode).toBe(200)
       expect(initializeFn).toHaveBeenCalledWith({
+        communityDid: 'did:plc:test',
         did: TEST_DID,
         communityName: 'My Forum',
         handle: 'forum.example.com',

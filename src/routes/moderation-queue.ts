@@ -1,6 +1,6 @@
 import { eq, and, desc, sql } from 'drizzle-orm'
+import { requireCommunityDid } from '../middleware/community-resolver.js'
 import type { FastifyPluginCallback } from 'fastify'
-import { getCommunityDid } from '../config/env.js'
 import { notFound, badRequest, conflict, errorResponseSchema } from '../lib/api-errors.js'
 import { wordFilterSchema, queueActionSchema, queueQuerySchema } from '../validation/anti-spam.js'
 import { moderationQueue } from '../db/schema/moderation-queue.js'
@@ -77,10 +77,9 @@ function decodeCursor(cursor: string): { createdAt: string; id: number } | null 
 
 export function moderationQueueRoutes(): FastifyPluginCallback {
   return (app, _opts, done) => {
-    const { db, env, authMiddleware } = app
+    const { db, authMiddleware } = app
     const requireModerator = createRequireModerator(db, authMiddleware, app.log)
     const requireAdmin = app.requireAdmin
-    const communityDid = getCommunityDid(env)
 
     // -------------------------------------------------------------------
     // GET /api/moderation/queue (moderator+)
@@ -122,6 +121,7 @@ export function moderationQueueRoutes(): FastifyPluginCallback {
         },
       },
       async (request, reply) => {
+        const communityDid = requireCommunityDid(request)
         const parsed = queueQuerySchema.safeParse(request.query)
         if (!parsed.success) {
           throw badRequest('Invalid query parameters')
@@ -208,6 +208,7 @@ export function moderationQueueRoutes(): FastifyPluginCallback {
         },
       },
       async (request, reply) => {
+        const communityDid = requireCommunityDid(request)
         const user = request.user
         if (!user) {
           return reply.status(401).send({ error: 'Authentication required' })
@@ -319,7 +320,7 @@ export function moderationQueueRoutes(): FastifyPluginCallback {
                 moderationThresholds: communitySettings.moderationThresholds,
               })
               .from(communitySettings)
-              .where(eq(communitySettings.id, 'default'))
+              .where(eq(communitySettings.communityDid, communityDid))
             const trustedPostThreshold =
               settingsRows[0]?.moderationThresholds.trustedPostThreshold ?? 10
 
@@ -403,11 +404,12 @@ export function moderationQueueRoutes(): FastifyPluginCallback {
           },
         },
       },
-      async (_request, reply) => {
+      async (request, reply) => {
+        const communityDid = requireCommunityDid(request)
         const rows = await db
           .select({ wordFilter: communitySettings.wordFilter })
           .from(communitySettings)
-          .where(eq(communitySettings.id, 'default'))
+          .where(eq(communitySettings.communityDid, communityDid))
 
         const words = rows[0]?.wordFilter ?? []
 
@@ -453,6 +455,7 @@ export function moderationQueueRoutes(): FastifyPluginCallback {
         },
       },
       async (request, reply) => {
+        const communityDid = requireCommunityDid(request)
         const parsed = wordFilterSchema.safeParse(request.body)
         if (!parsed.success) {
           throw badRequest('Invalid word filter data')
@@ -464,7 +467,7 @@ export function moderationQueueRoutes(): FastifyPluginCallback {
         await db
           .update(communitySettings)
           .set({ wordFilter: words })
-          .where(eq(communitySettings.id, 'default'))
+          .where(eq(communitySettings.communityDid, communityDid))
 
         // Invalidate cached anti-spam settings
         try {

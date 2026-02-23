@@ -77,7 +77,7 @@ export async function loadAntiSpamSettings(
       wordFilter: communitySettings.wordFilter,
     })
     .from(communitySettings)
-    .where(eq(communitySettings.id, 'default'))
+    .where(eq(communitySettings.communityDid, communityDid))
 
   const row = rows[0]
   const thresholds = row?.moderationThresholds

@@ -2,6 +2,7 @@ import { defineConfig } from 'drizzle-kit'
 
 export default defineConfig({
   schema: [
+    './src/db/schema/roles.ts',
     './src/db/schema/users.ts',
     './src/db/schema/firehose.ts',
     './src/db/schema/topics.ts',

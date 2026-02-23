@@ -1,4 +1,5 @@
 import { eq, sql } from 'drizzle-orm'
+import { requireCommunityDid } from '../middleware/community-resolver.js'
 import type { FastifyPluginCallback } from 'fastify'
 import { notFound, badRequest, errorResponseSchema } from '../lib/api-errors.js'
 import { isMaturityLowerThan } from '../lib/maturity.js'
@@ -13,9 +14,8 @@ import { categories } from '../db/schema/categories.js'
 const settingsJsonSchema = {
   type: 'object' as const,
   properties: {
-    id: { type: 'string' as const },
     initialized: { type: 'boolean' as const },
-    communityDid: { type: ['string', 'null'] as const },
+    communityDid: { type: 'string' as const },
     adminDid: { type: ['string', 'null'] as const },
     communityName: { type: 'string' as const },
     maturityRating: { type: 'string' as const, enum: ['safe', 'mature', 'adult'] },
@@ -78,9 +78,8 @@ const statsJsonSchema = {
 
 function serializeSettings(row: typeof communitySettings.$inferSelect) {
   return {
-    id: row.id,
     initialized: row.initialized,
-    communityDid: row.communityDid ?? null,
+    communityDid: row.communityDid,
     adminDid: row.adminDid ?? null,
     communityName: row.communityName,
     maturityRating: row.maturityRating,
@@ -138,11 +137,12 @@ export function adminSettingsRoutes(): FastifyPluginCallback {
           },
         },
       },
-      async (_request, reply) => {
+      async (request, reply) => {
+        const communityDid = requireCommunityDid(request)
         const rows = await db
           .select()
           .from(communitySettings)
-          .where(eq(communitySettings.id, 'default'))
+          .where(eq(communitySettings.communityDid, communityDid))
 
         const row = rows[0]
         if (!row) {
@@ -150,7 +150,7 @@ export function adminSettingsRoutes(): FastifyPluginCallback {
         }
 
         return reply.status(200).send({
-          communityDid: row.communityDid ?? null,
+          communityDid: row.communityDid,
           communityName: row.communityName,
           maturityRating: row.maturityRating,
           communityDescription: row.communityDescription ?? null,
@@ -179,11 +179,12 @@ export function adminSettingsRoutes(): FastifyPluginCallback {
           },
         },
       },
-      async (_request, reply) => {
+      async (request, reply) => {
+        const communityDid = requireCommunityDid(request)
         const rows = await db
           .select()
           .from(communitySettings)
-          .where(eq(communitySettings.id, 'default'))
+          .where(eq(communitySettings.communityDid, communityDid))
 
         const row = rows[0]
         if (!row) {
@@ -242,6 +243,7 @@ export function adminSettingsRoutes(): FastifyPluginCallback {
         },
       },
       async (request, reply) => {
+        const communityDid = requireCommunityDid(request)
         const parsed = updateSettingsSchema.safeParse(request.body)
         if (!parsed.success) {
           throw badRequest('Invalid settings data')
@@ -269,7 +271,7 @@ export function adminSettingsRoutes(): FastifyPluginCallback {
         const rows = await db
           .select()
           .from(communitySettings)
-          .where(eq(communitySettings.id, 'default'))
+          .where(eq(communitySettings.communityDid, communityDid))
 
         const current = rows[0]
         if (!current) {
@@ -288,11 +290,11 @@ export function adminSettingsRoutes(): FastifyPluginCallback {
 
           if (isMaturityLowerThan(currentRating, newRating)) {
             // Raising maturity: find categories below the new threshold
-            const communityDid = current.communityDid ?? ''
+            const settingsCommunityDid = current.communityDid
             const allCategories = await db
               .select()
               .from(categories)
-              .where(eq(categories.communityDid, communityDid))
+              .where(eq(categories.communityDid, settingsCommunityDid))
 
             // Filter in application code since maturity comparison is enum-based
             const belowThreshold = allCategories.filter((cat) =>
@@ -355,7 +357,7 @@ export function adminSettingsRoutes(): FastifyPluginCallback {
         const updated = await db
           .update(communitySettings)
           .set(dbUpdates)
-          .where(eq(communitySettings.id, 'default'))
+          .where(eq(communitySettings.communityDid, communityDid))
           .returning()
 
         const updatedRow = updated[0]

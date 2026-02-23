@@ -1,9 +1,11 @@
-import { pgTable, text, boolean, timestamp, jsonb, integer } from 'drizzle-orm/pg-core'
+import { pgTable, pgPolicy, text, boolean, timestamp, jsonb, integer } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
+import { appRole } from './roles.js'
 
 export const communitySettings = pgTable('community_settings', {
-  id: text('id').primaryKey().default('default'),
+  communityDid: text('community_did').primaryKey(),
+  domains: jsonb('domains').$type<string[]>().notNull().default([]),
   initialized: boolean('initialized').notNull().default(false),
-  communityDid: text('community_did'),
   adminDid: text('admin_did'),
   communityName: text('community_name').notNull().default('Barazo Community'),
   maturityRating: text('maturity_rating', {
@@ -54,4 +56,12 @@ export const communitySettings = pgTable('community_settings', {
   accentColor: text('accent_color'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-})
+}, () => [
+  pgPolicy('tenant_isolation', {
+    as: 'permissive',
+    to: appRole,
+    for: 'all',
+    using: sql`community_did = current_setting('app.current_community_did', true)`,
+    withCheck: sql`community_did = current_setting('app.current_community_did', true)`,
+  }),
+]).enableRLS()

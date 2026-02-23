@@ -14,6 +14,8 @@ export type SetupStatus = { initialized: false } | { initialized: true; communit
 
 /** Parameters for community initialization. */
 export interface InitializeParams {
+  /** Community DID (primary key for the settings row) */
+  communityDid: string
   /** DID of the authenticated user who becomes admin */
   did: string
   /** Optional community name override */
@@ -36,7 +38,7 @@ export type InitializeResult =
 
 /** Setup service interface for dependency injection and testing. */
 export interface SetupService {
-  getStatus(): Promise<SetupStatus>
+  getStatus(communityDid: string): Promise<SetupStatus>
   initialize(params: InitializeParams): Promise<InitializeResult>
 }
 
@@ -72,9 +74,10 @@ export function createSetupService(
   /**
    * Check whether the community has been initialized.
    *
+   * @param communityDid - The community DID to check status for
    * @returns SetupStatus indicating initialization state
    */
-  async function getStatus(): Promise<SetupStatus> {
+  async function getStatus(communityDid: string): Promise<SetupStatus> {
     try {
       const rows = await db
         .select({
@@ -82,7 +85,7 @@ export function createSetupService(
           communityName: communitySettings.communityName,
         })
         .from(communitySettings)
-        .where(eq(communitySettings.id, 'default'))
+        .where(eq(communitySettings.communityDid, communityDid))
 
       const row = rows[0]
 
@@ -112,11 +115,11 @@ export function createSetupService(
    * @returns InitializeResult with the new state or conflict indicator
    */
   async function initialize(params: InitializeParams): Promise<InitializeResult> {
-    const { did, communityName, handle, serviceEndpoint } = params
+    const { communityDid, did, communityName, handle, serviceEndpoint } = params
 
     try {
       // Generate PLC DID if handle and serviceEndpoint are provided
-      let communityDid: string | undefined
+      let plcDid: string | undefined
       let signingKeyHex: string | undefined
       let rotationKeyHex: string | undefined
 
@@ -128,11 +131,11 @@ export function createSetupService(
           serviceEndpoint,
         })
 
-        communityDid = didResult.did
+        plcDid = didResult.did
         signingKeyHex = encrypt(didResult.signingKey, encryptionKey)
         rotationKeyHex = encrypt(didResult.rotationKey, encryptionKey)
 
-        logger.info({ communityDid, handle }, 'PLC DID generated successfully')
+        logger.info({ plcDid, handle }, 'PLC DID generated successfully')
       } else if (handle && serviceEndpoint && !plcDidService) {
         logger.warn(
           { handle, serviceEndpoint },
@@ -145,23 +148,21 @@ export function createSetupService(
       const rows = await db
         .insert(communitySettings)
         .values({
-          id: 'default',
+          communityDid,
           initialized: true,
           adminDid: did,
           communityName: communityName ?? DEFAULT_COMMUNITY_NAME,
-          communityDid: communityDid ?? null,
           handle: handle ?? null,
           serviceEndpoint: serviceEndpoint ?? null,
           signingKey: signingKeyHex ?? null,
           rotationKey: rotationKeyHex ?? null,
         })
         .onConflictDoUpdate({
-          target: communitySettings.id,
+          target: communitySettings.communityDid,
           set: {
             initialized: true,
             adminDid: did,
             communityName: communityName ? communityName : sql`${communitySettings.communityName}`,
-            communityDid: communityDid ?? sql`${communitySettings.communityDid}`,
             handle: handle ?? sql`${communitySettings.handle}`,
             serviceEndpoint: serviceEndpoint ?? sql`${communitySettings.serviceEndpoint}`,
             signingKey: signingKeyHex ?? sql`${communitySettings.signingKey}`,
@@ -190,8 +191,8 @@ export function createSetupService(
         communityName: finalName,
       }
 
-      if (row.communityDid) {
-        result.communityDid = row.communityDid
+      if (plcDid) {
+        result.communityDid = plcDid
       }
 
       return result

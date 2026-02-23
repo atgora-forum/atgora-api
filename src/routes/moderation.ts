@@ -1,6 +1,6 @@
 import { eq, and, desc, sql } from 'drizzle-orm'
+import { requireCommunityDid } from '../middleware/community-resolver.js'
 import type { FastifyPluginCallback } from 'fastify'
-import { getCommunityDid } from '../config/env.js'
 import {
   notFound,
   forbidden,
@@ -143,7 +143,6 @@ export function moderationRoutes(): FastifyPluginCallback {
     const { db, env, authMiddleware } = app
     const requireModerator = createRequireModerator(db, authMiddleware, app.log)
     const requireAdmin = app.requireAdmin
-    const communityDid = getCommunityDid(env)
     const notificationService = createNotificationService(db, app.log)
 
     // -------------------------------------------------------------------
@@ -184,6 +183,7 @@ export function moderationRoutes(): FastifyPluginCallback {
         },
       },
       async (request, reply) => {
+        const communityDid = requireCommunityDid(request)
         const user = request.user
         if (!user) {
           return reply.status(401).send({ error: 'Authentication required' })
@@ -277,6 +277,7 @@ export function moderationRoutes(): FastifyPluginCallback {
         },
       },
       async (request, reply) => {
+        const communityDid = requireCommunityDid(request)
         const user = request.user
         if (!user) {
           return reply.status(401).send({ error: 'Authentication required' })
@@ -373,6 +374,7 @@ export function moderationRoutes(): FastifyPluginCallback {
         },
       },
       async (request, reply) => {
+        const communityDid = requireCommunityDid(request)
         const user = request.user
         if (!user) {
           return reply.status(401).send({ error: 'Authentication required' })
@@ -528,6 +530,7 @@ export function moderationRoutes(): FastifyPluginCallback {
         },
       },
       async (request, reply) => {
+        const communityDid = requireCommunityDid(request)
         const admin = request.user
         if (!admin) {
           return reply.status(401).send({ error: 'Authentication required' })
@@ -575,8 +578,8 @@ export function moderationRoutes(): FastifyPluginCallback {
 
         app.log.info({ action, targetDid, adminDid: admin.did }, `User ${action}ned`)
 
-        // In global mode, check ban propagation across communities
-        if (env.COMMUNITY_MODE === 'global' && action === 'ban') {
+        // In multi mode, check ban propagation across communities
+        if (env.COMMUNITY_MODE === 'multi' && action === 'ban') {
           try {
             const result = await checkBanPropagation(db, app.cache, app.log, targetDid)
             if (result.propagated) {
@@ -646,6 +649,7 @@ export function moderationRoutes(): FastifyPluginCallback {
         },
       },
       async (request, reply) => {
+        const communityDid = requireCommunityDid(request)
         const parsed = moderationLogQuerySchema.safeParse(request.query)
         if (!parsed.success) {
           throw badRequest('Invalid query parameters')
@@ -729,6 +733,7 @@ export function moderationRoutes(): FastifyPluginCallback {
         },
       },
       async (request, reply) => {
+        const communityDid = requireCommunityDid(request)
         const user = request.user
         if (!user) {
           return reply.status(401).send({ error: 'Authentication required' })
@@ -810,8 +815,8 @@ export function moderationRoutes(): FastifyPluginCallback {
           'Content reported'
         )
 
-        // In global mode, notify the community admin about the report
-        if (env.COMMUNITY_MODE === 'global') {
+        // In multi mode, notify the community admin about the report
+        if (env.COMMUNITY_MODE === 'multi') {
           try {
             const filterRows = await db
               .select({ adminDid: communityFilters.adminDid })
@@ -873,6 +878,7 @@ export function moderationRoutes(): FastifyPluginCallback {
         },
       },
       async (request, reply) => {
+        const communityDid = requireCommunityDid(request)
         const parsed = reportQuerySchema.safeParse(request.query)
         if (!parsed.success) {
           throw badRequest('Invalid query parameters')
@@ -959,6 +965,7 @@ export function moderationRoutes(): FastifyPluginCallback {
         },
       },
       async (request, reply) => {
+        const communityDid = requireCommunityDid(request)
         const user = request.user
         if (!user) {
           return reply.status(401).send({ error: 'Authentication required' })
@@ -1056,6 +1063,7 @@ export function moderationRoutes(): FastifyPluginCallback {
         },
       },
       async (request, reply) => {
+        const communityDid = requireCommunityDid(request)
         const parsed = reportedUsersQuerySchema.safeParse(request.query)
         const limit = parsed.success ? parsed.data.limit : 25
 
@@ -1108,11 +1116,12 @@ export function moderationRoutes(): FastifyPluginCallback {
           },
         },
       },
-      async (_request, reply) => {
+      async (request, reply) => {
+        const communityDid = requireCommunityDid(request)
         const settingsRows = await db
           .select({ moderationThresholds: communitySettings.moderationThresholds })
           .from(communitySettings)
-          .where(eq(communitySettings.id, 'default'))
+          .where(eq(communitySettings.communityDid, communityDid))
 
         const settings = settingsRows[0]
         const t = settings?.moderationThresholds
@@ -1183,6 +1192,7 @@ export function moderationRoutes(): FastifyPluginCallback {
         },
       },
       async (request, reply) => {
+        const communityDid = requireCommunityDid(request)
         const parsed = moderationThresholdsSchema.safeParse(request.body)
         if (!parsed.success) {
           throw badRequest('Invalid threshold values')
@@ -1192,7 +1202,7 @@ export function moderationRoutes(): FastifyPluginCallback {
         const existingRows = await db
           .select({ moderationThresholds: communitySettings.moderationThresholds })
           .from(communitySettings)
-          .where(eq(communitySettings.id, 'default'))
+          .where(eq(communitySettings.communityDid, communityDid))
 
         const existing = existingRows[0]?.moderationThresholds ?? {
           autoBlockReportCount: 5,
@@ -1220,7 +1230,7 @@ export function moderationRoutes(): FastifyPluginCallback {
         await db
           .update(communitySettings)
           .set({ moderationThresholds: merged })
-          .where(eq(communitySettings.id, 'default'))
+          .where(eq(communitySettings.communityDid, communityDid))
 
         // Invalidate cached anti-spam settings
         try {
@@ -1266,6 +1276,7 @@ export function moderationRoutes(): FastifyPluginCallback {
         },
       },
       async (request, reply) => {
+        const communityDid = requireCommunityDid(request)
         const user = request.user
         if (!user) {
           return reply.status(401).send({ error: 'Authentication required' })
@@ -1354,6 +1365,7 @@ export function moderationRoutes(): FastifyPluginCallback {
         },
       },
       async (request, reply) => {
+        const communityDid = requireCommunityDid(request)
         const user = request.user
         if (!user) {
           return reply.status(401).send({ error: 'Authentication required' })

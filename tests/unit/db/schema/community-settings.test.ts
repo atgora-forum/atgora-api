@@ -9,17 +9,17 @@ describe('communitySettings schema', () => {
     expect(getTableName(communitySettings)).toBe('community_settings')
   })
 
-  it('uses id as primary key', () => {
-    expect(columns.id.primary).toBe(true)
+  it('uses communityDid as primary key', () => {
+    expect(columns.communityDid.primary).toBe(true)
   })
 
   it('has all required columns', () => {
     const columnNames = Object.keys(columns)
 
     const expected = [
-      'id',
-      'initialized',
       'communityDid',
+      'domains',
+      'initialized',
       'adminDid',
       'communityName',
       'maturityRating',
@@ -37,16 +37,22 @@ describe('communitySettings schema', () => {
     }
   })
 
-  it('has default value for id', () => {
-    expect(columns.id.hasDefault).toBe(true)
+  it('does not have an id column', () => {
+    const columnNames = Object.keys(columns)
+    expect(columnNames).not.toContain('id')
+  })
+
+  it('has domains column with default empty array', () => {
+    expect(columns.domains.notNull).toBe(true)
+    expect(columns.domains.hasDefault).toBe(true)
   })
 
   it('has default value for initialized (false)', () => {
     expect(columns.initialized.hasDefault).toBe(true)
   })
 
-  it('has nullable communityDid', () => {
-    expect(columns.communityDid.notNull).toBe(false)
+  it('has notNull communityDid', () => {
+    expect(columns.communityDid.notNull).toBe(true)
   })
 
   it('has nullable adminDid', () => {
@@ -79,7 +85,7 @@ describe('communitySettings schema', () => {
   })
 
   it('has non-nullable required columns', () => {
-    expect(columns.id.notNull).toBe(true)
+    expect(columns.communityDid.notNull).toBe(true)
     expect(columns.initialized.notNull).toBe(true)
     expect(columns.communityName.notNull).toBe(true)
     expect(columns.maturityRating.notNull).toBe(true)

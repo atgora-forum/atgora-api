@@ -1,6 +1,6 @@
 import { eq, and, desc, sql, inArray, notInArray, isNotNull, ne, or } from 'drizzle-orm'
+import { requireCommunityDid } from '../middleware/community-resolver.js'
 import type { FastifyPluginCallback } from 'fastify'
-import { getCommunityDid } from '../config/env.js'
 import { createPdsClient } from '../lib/pds-client.js'
 import {
   notFound,
@@ -251,7 +251,7 @@ export function topicRoutes(): FastifyPluginCallback {
 
         const { title, content, category, tags, labels } = parsed.data
         const now = new Date().toISOString()
-        const communityDid = getCommunityDid(env)
+        const communityDid = requireCommunityDid(request)
 
         // Onboarding gate: block if user hasn't completed mandatory onboarding
         const onboarding = await checkOnboardingComplete(db, user.did, communityDid)
@@ -280,7 +280,7 @@ export function topicRoutes(): FastifyPluginCallback {
         const settingsRows = await db
           .select({ ageThreshold: communitySettings.ageThreshold })
           .from(communitySettings)
-          .where(eq(communitySettings.id, 'default'))
+          .where(eq(communitySettings.communityDid, communityDid))
         const ageThreshold = settingsRows[0]?.ageThreshold ?? 16
 
         const maxMaturity = resolveMaxMaturity(userProfile, ageThreshold)
@@ -538,12 +538,15 @@ export function topicRoutes(): FastifyPluginCallback {
           }
         }
 
-        // Fetch community age threshold
-        const settingsRowsList = await db
-          .select({ ageThreshold: communitySettings.ageThreshold })
-          .from(communitySettings)
-          .where(eq(communitySettings.id, 'default'))
-        const listAgeThreshold = settingsRowsList[0]?.ageThreshold ?? 16
+        // Fetch community age threshold (use request.communityDid if available, else default)
+        let listAgeThreshold = 16
+        if (request.communityDid) {
+          const settingsRowsList = await db
+            .select({ ageThreshold: communitySettings.ageThreshold })
+            .from(communitySettings)
+            .where(eq(communitySettings.communityDid, request.communityDid))
+          listAgeThreshold = settingsRowsList[0]?.ageThreshold ?? 16
+        }
 
         const maxMaturity = resolveMaxMaturity(userProfile, listAgeThreshold)
         const allowed = allowedRatings(maxMaturity)
@@ -551,9 +554,9 @@ export function topicRoutes(): FastifyPluginCallback {
         // Slug→maturityRating lookup, populated by the category queries below
         const categoryMaturityMap = new Map<string, string>()
 
-        if (env.COMMUNITY_MODE === 'global') {
+        if (env.COMMUNITY_MODE === 'multi') {
           // ---------------------------------------------------------------
-          // Global mode: multi-community filtering
+          // Multi mode: multi-community filtering
           // ---------------------------------------------------------------
 
           // Get all community settings with a valid communityDid
@@ -568,12 +571,13 @@ export function topicRoutes(): FastifyPluginCallback {
           // Filter: NEVER show adult communities in global mode,
           // check mature communities against user's max maturity preference
           const allowedCommunityDids = communityRows
-            .filter((c) => {
-              if (!c.communityDid) return false
-              if (c.maturityRating === 'adult') return false
-              return maturityAllows(maxMaturity, c.maturityRating)
-            })
-            .map((c) => c.communityDid as string)
+            .filter(
+              (c): c is typeof c & { communityDid: string } =>
+                !!c.communityDid &&
+                c.maturityRating !== 'adult' &&
+                maturityAllows(maxMaturity, c.maturityRating)
+            )
+            .map((c) => c.communityDid)
 
           if (allowedCommunityDids.length === 0) {
             return reply.status(200).send({ topics: [], cursor: null })
@@ -622,7 +626,7 @@ export function topicRoutes(): FastifyPluginCallback {
           // Single mode: filter by the one configured community
           // ---------------------------------------------------------------
 
-          const communityDid = getCommunityDid(env)
+          const communityDid = requireCommunityDid(request)
 
           // Get category slugs matching allowed maturity levels
           const allowedCategories = await db
@@ -710,13 +714,13 @@ export function topicRoutes(): FastifyPluginCallback {
         }
 
         // Load muted words for content filtering
-        const communityDid = env.COMMUNITY_MODE === 'single' ? env.COMMUNITY_DID : undefined
+        const communityDid = requireCommunityDid(request)
         const mutedWords = await loadMutedWords(request.user?.did, communityDid, db)
 
         // Batch-resolve author profiles
         const authorMap = await resolveAuthors(
           serialized.map((t) => t.authorDid),
-          communityDid ?? null,
+          communityDid,
           db
         )
 
@@ -786,7 +790,7 @@ export function topicRoutes(): FastifyPluginCallback {
         }
 
         // Look up the category maturity rating
-        const communityDid = getCommunityDid(env)
+        const communityDid = requireCommunityDid(request)
         const catRows = await db
           .select({ maturityRating: categories.maturityRating })
           .from(categories)
@@ -806,7 +810,7 @@ export function topicRoutes(): FastifyPluginCallback {
         const rkeySettingsRows = await db
           .select({ ageThreshold: communitySettings.ageThreshold })
           .from(communitySettings)
-          .where(eq(communitySettings.id, 'default'))
+          .where(eq(communitySettings.communityDid, communityDid))
         const rkeyAgeThreshold = rkeySettingsRows[0]?.ageThreshold ?? 16
 
         const maxMaturity = resolveMaxMaturity(userProfile, rkeyAgeThreshold)
@@ -855,7 +859,7 @@ export function topicRoutes(): FastifyPluginCallback {
         }
 
         // Maturity check: verify the topic's category is within the user's allowed level
-        const communityDid = getCommunityDid(env)
+        const communityDid = requireCommunityDid(request)
         const catRows = await db
           .select({ maturityRating: categories.maturityRating })
           .from(categories)
@@ -882,7 +886,7 @@ export function topicRoutes(): FastifyPluginCallback {
         const singleSettingsRows = await db
           .select({ ageThreshold: communitySettings.ageThreshold })
           .from(communitySettings)
-          .where(eq(communitySettings.id, 'default'))
+          .where(eq(communitySettings.communityDid, communityDid))
         const singleAgeThreshold = singleSettingsRows[0]?.ageThreshold ?? 16
 
         const maxMaturity = resolveMaxMaturity(userProfile, singleAgeThreshold)
