@@ -9,7 +9,14 @@ import scalarApiReference from '@scalar/fastify-api-reference'
 import * as Sentry from '@sentry/node'
 import type { FastifyError } from 'fastify'
 import type { NodeOAuthClient } from '@atproto/oauth-client-node'
+import { sql } from 'drizzle-orm'
 import type { Env } from './config/env.js'
+import { getCommunityDid } from './config/env.js'
+import {
+  createSingleResolver,
+  registerCommunityResolver,
+} from './middleware/community-resolver.js'
+import type { CommunityResolver } from './middleware/community-resolver.js'
 import { createDb } from './db/index.js'
 import { createCache } from './cache/index.js'
 import { FirehoseService } from './firehose/service.js'
@@ -160,6 +167,32 @@ export async function buildApp(env: Env) {
   // Multipart file uploads
   await app.register(multipart, {
     limits: { fileSize: env.UPLOAD_MAX_SIZE_BYTES },
+  })
+
+  // Community resolver (must run before auth middleware)
+  let resolver: CommunityResolver
+  if (env.COMMUNITY_MODE === 'multi') {
+    try {
+      const { createMultiResolver } = await import('@barazo/multi-tenant')
+      resolver = createMultiResolver(db, cache)
+    } catch {
+      throw new Error(
+        'COMMUNITY_MODE is "multi" but @barazo/multi-tenant package is not installed. ' +
+          'Install it or switch to COMMUNITY_MODE="single".'
+      )
+    }
+  } else {
+    resolver = createSingleResolver(getCommunityDid(env))
+  }
+  registerCommunityResolver(app, resolver, env.COMMUNITY_MODE)
+
+  // Set RLS session variable per request
+  app.addHook('onRequest', async (request) => {
+    if (request.communityDid) {
+      await db.execute(
+        sql`SELECT set_config('app.current_community_did', ${request.communityDid}, true)`
+      )
+    }
   })
 
   // OAuth client
