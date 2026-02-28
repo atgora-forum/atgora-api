@@ -257,4 +257,34 @@ describe('ProfileSyncService', () => {
 
     expect(result.hasBlueskyProfile).toBe(false)
   })
+
+  // -------------------------------------------------------------------------
+  // Display name sanitization
+  // -------------------------------------------------------------------------
+
+  it('strips control characters from displayName', async () => {
+    mockGetProfile.mockResolvedValue({
+      success: true,
+      data: {
+        ...MOCK_PROFILE_RESPONSE.data,
+        displayName: 'Alice\u200BWonderland',
+      },
+    })
+
+    const result = await service.syncProfile(TEST_DID)
+    expect(result.displayName).toBe('AliceWonderland')
+  })
+
+  it('returns null displayName when name is all control characters', async () => {
+    mockGetProfile.mockResolvedValue({
+      success: true,
+      data: {
+        ...MOCK_PROFILE_RESPONSE.data,
+        displayName: '\u200B\u200C\u200D',
+      },
+    })
+
+    const result = await service.syncProfile(TEST_DID)
+    expect(result.displayName).toBeNull()
+  })
 })

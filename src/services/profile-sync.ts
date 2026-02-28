@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import type { Logger } from '../lib/logger.js'
 import type { Database } from '../db/index.js'
 import { users } from '../db/schema/users.js'
+import { stripControlCharacters } from '../lib/sanitize-text.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -94,8 +95,9 @@ export function createProfileSyncService(
       try {
         const agent = agentFactory.createAgent()
         const response = await agent.getProfile({ actor: did })
+        const sanitizedName = stripControlCharacters(response.data.displayName ?? '')
         profileData = {
-          displayName: response.data.displayName ?? null,
+          displayName: sanitizedName || null,
           avatarUrl: response.data.avatar ?? null,
           bannerUrl: response.data.banner ?? null,
           bio: response.data.description ?? null,
