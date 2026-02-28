@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import type { Logger } from '../lib/logger.js'
 import type { Database } from '../db/index.js'
 import { users } from '../db/schema/users.js'
+import { stripControlCharacters } from '../lib/sanitize-text.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -14,6 +15,10 @@ export interface ProfileData {
   avatarUrl: string | null
   bannerUrl: string | null
   bio: string | null
+  followersCount: number
+  followsCount: number
+  atprotoPostsCount: number
+  hasBlueskyProfile: boolean
   labels: Array<{ val: string; src: string; neg: boolean; cts: string }>
 }
 
@@ -27,6 +32,10 @@ const NULL_PROFILE: ProfileData = {
   avatarUrl: null,
   bannerUrl: null,
   bio: null,
+  followersCount: 0,
+  followsCount: 0,
+  atprotoPostsCount: 0,
+  hasBlueskyProfile: false,
   labels: [],
 }
 
@@ -45,6 +54,9 @@ interface AgentLike {
       avatar?: string
       banner?: string
       description?: string
+      followersCount?: number
+      followsCount?: number
+      postsCount?: number
       labels?: Array<{ val: string; src: string; uri: string; neg?: boolean; cts: string }>
     }
   }>
@@ -92,11 +104,16 @@ export function createProfileSyncService(
           .filter((l) => !l.neg)
           .map((l) => ({ val: l.val, src: l.src, neg: false as const, cts: l.cts }))
 
+        const sanitizedName = stripControlCharacters(response.data.displayName ?? '')
         profileData = {
-          displayName: response.data.displayName ?? null,
+          displayName: sanitizedName || null,
           avatarUrl: response.data.avatar ?? null,
           bannerUrl: response.data.banner ?? null,
           bio: response.data.description ?? null,
+          followersCount: response.data.followersCount ?? 0,
+          followsCount: response.data.followsCount ?? 0,
+          atprotoPostsCount: response.data.postsCount ?? 0,
+          hasBlueskyProfile: true,
           labels,
         }
       } catch (err: unknown) {
@@ -113,6 +130,10 @@ export function createProfileSyncService(
             avatarUrl: profileData.avatarUrl,
             bannerUrl: profileData.bannerUrl,
             bio: profileData.bio,
+            followersCount: profileData.followersCount,
+            followsCount: profileData.followsCount,
+            atprotoPostsCount: profileData.atprotoPostsCount,
+            hasBlueskyProfile: profileData.hasBlueskyProfile,
             atprotoLabels: profileData.labels,
             lastActiveAt: new Date(),
           })

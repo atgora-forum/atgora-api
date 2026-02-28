@@ -58,6 +58,9 @@ const MOCK_PROFILE_RESPONSE = {
     avatar: 'https://cdn.bsky.app/img/avatar/plain/did:plc:testuser123456789012/bafkreiabc@jpeg',
     banner: 'https://cdn.bsky.app/img/banner/plain/did:plc:testuser123456789012/bafkreixyz@jpeg',
     description: 'Exploring the decentralized web.',
+    followersCount: 150,
+    followsCount: 75,
+    postsCount: 230,
     labels: [
       {
         src: TEST_DID,
@@ -128,6 +131,10 @@ describe('ProfileSyncService', () => {
       bannerUrl:
         'https://cdn.bsky.app/img/banner/plain/did:plc:testuser123456789012/bafkreixyz@jpeg',
       bio: 'Exploring the decentralized web.',
+      followersCount: 150,
+      followsCount: 75,
+      atprotoPostsCount: 230,
+      hasBlueskyProfile: true,
       labels: [
         { val: 'adult-content', src: TEST_DID, neg: false, cts: '2026-01-15T10:00:00.000Z' },
         {
@@ -192,6 +199,10 @@ describe('ProfileSyncService', () => {
       avatarUrl: null,
       bannerUrl: null,
       bio: null,
+      followersCount: 0,
+      followsCount: 0,
+      atprotoPostsCount: 0,
+      hasBlueskyProfile: true,
       labels: [],
     })
   })
@@ -210,6 +221,10 @@ describe('ProfileSyncService', () => {
       avatarUrl: null,
       bannerUrl: null,
       bio: null,
+      followersCount: 0,
+      followsCount: 0,
+      atprotoPostsCount: 0,
+      hasBlueskyProfile: false,
       labels: [],
     })
   })
@@ -250,6 +265,10 @@ describe('ProfileSyncService', () => {
       bannerUrl:
         'https://cdn.bsky.app/img/banner/plain/did:plc:testuser123456789012/bafkreixyz@jpeg',
       bio: 'Exploring the decentralized web.',
+      followersCount: 150,
+      followsCount: 75,
+      atprotoPostsCount: 230,
+      hasBlueskyProfile: true,
       labels: [
         { val: 'adult-content', src: TEST_DID, neg: false, cts: '2026-01-15T10:00:00.000Z' },
         {
@@ -280,5 +299,61 @@ describe('ProfileSyncService', () => {
       expect.objectContaining({ did: TEST_DID }) as Record<string, unknown>,
       expect.stringContaining('profile DB update failed') as string
     )
+  })
+
+  // -------------------------------------------------------------------------
+  // AT Protocol stats capture
+  // -------------------------------------------------------------------------
+
+  it('captures followersCount, followsCount, and atprotoPostsCount from profile response', async () => {
+    const result = await service.syncProfile(TEST_DID)
+
+    expect(result.followersCount).toBe(150)
+    expect(result.followsCount).toBe(75)
+    expect(result.atprotoPostsCount).toBe(230)
+  })
+
+  it('sets hasBlueskyProfile to true when fetch succeeds', async () => {
+    const result = await service.syncProfile(TEST_DID)
+
+    expect(result.hasBlueskyProfile).toBe(true)
+  })
+
+  it('sets hasBlueskyProfile to false when fetch fails', async () => {
+    mockGetProfile.mockRejectedValue(new Error('Profile not found'))
+
+    const result = await service.syncProfile(TEST_DID)
+
+    expect(result.hasBlueskyProfile).toBe(false)
+  })
+
+  // -------------------------------------------------------------------------
+  // Display name sanitization
+  // -------------------------------------------------------------------------
+
+  it('strips control characters from displayName', async () => {
+    mockGetProfile.mockResolvedValue({
+      success: true,
+      data: {
+        ...MOCK_PROFILE_RESPONSE.data,
+        displayName: 'Alice\u200BWonderland',
+      },
+    })
+
+    const result = await service.syncProfile(TEST_DID)
+    expect(result.displayName).toBe('AliceWonderland')
+  })
+
+  it('returns null displayName when name is all control characters', async () => {
+    mockGetProfile.mockResolvedValue({
+      success: true,
+      data: {
+        ...MOCK_PROFILE_RESPONSE.data,
+        displayName: '\u200B\u200C\u200D',
+      },
+    })
+
+    const result = await service.syncProfile(TEST_DID)
+    expect(result.displayName).toBeNull()
   })
 })
