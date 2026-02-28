@@ -19,6 +19,7 @@ export interface ProfileData {
   followsCount: number
   atprotoPostsCount: number
   hasBlueskyProfile: boolean
+  labels: Array<{ val: string; src: string; neg: boolean; cts: string }>
 }
 
 export interface ProfileSyncService {
@@ -35,6 +36,7 @@ const NULL_PROFILE: ProfileData = {
   followsCount: 0,
   atprotoPostsCount: 0,
   hasBlueskyProfile: false,
+  labels: [],
 }
 
 // ---------------------------------------------------------------------------
@@ -47,6 +49,7 @@ const BSKY_PUBLIC_API = 'https://public.api.bsky.app'
 interface AgentLike {
   getProfile(params: { actor: string }): Promise<{
     data: {
+      did?: string
       displayName?: string
       avatar?: string
       banner?: string
@@ -54,6 +57,7 @@ interface AgentLike {
       followersCount?: number
       followsCount?: number
       postsCount?: number
+      labels?: Array<{ val: string; src: string; uri: string; neg?: boolean; cts: string }>
     }
   }>
 }
@@ -95,6 +99,11 @@ export function createProfileSyncService(
       try {
         const agent = agentFactory.createAgent()
         const response = await agent.getProfile({ actor: did })
+        const rawLabels = response.data.labels ?? []
+        const labels = rawLabels
+          .filter((l) => !l.neg)
+          .map((l) => ({ val: l.val, src: l.src, neg: false as const, cts: l.cts }))
+
         const sanitizedName = stripControlCharacters(response.data.displayName ?? '')
         profileData = {
           displayName: sanitizedName || null,
@@ -105,6 +114,7 @@ export function createProfileSyncService(
           followsCount: response.data.followsCount ?? 0,
           atprotoPostsCount: response.data.postsCount ?? 0,
           hasBlueskyProfile: true,
+          labels,
         }
       } catch (err: unknown) {
         logger.debug({ did, err }, 'profile sync failed: could not fetch profile from public API')
@@ -124,6 +134,7 @@ export function createProfileSyncService(
             followsCount: profileData.followsCount,
             atprotoPostsCount: profileData.atprotoPostsCount,
             hasBlueskyProfile: profileData.hasBlueskyProfile,
+            atprotoLabels: profileData.labels,
             lastActiveAt: new Date(),
           })
           .where(eq(users.did, did))

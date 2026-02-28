@@ -218,6 +218,13 @@
       "when": 1771876800000,
       "tag": "0030_atproto_profile_stats",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1772265600000,
+      "tag": "0031_atproto_labels",
+      "breakpoints": true
     }
   ]
 }

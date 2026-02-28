@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, integer, index } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, boolean, integer, index, jsonb } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 
 export const users = pgTable(
@@ -29,6 +29,11 @@ export const users = pgTable(
     followsCount: integer('follows_count').notNull().default(0),
     atprotoPostsCount: integer('atproto_posts_count').notNull().default(0),
     hasBlueskyProfile: boolean('has_bluesky_profile').notNull().default(false),
+    /** AT Protocol labels from the Bluesky AppView (self-applied and moderator-applied). */
+    atprotoLabels: jsonb('atproto_labels')
+      .$type<Array<{ val: string; src: string; neg: boolean; cts: string }>>()
+      .notNull()
+      .default([]),
   },
   (table) => [
     index('users_role_elevated_idx')

@@ -61,6 +61,17 @@ const profileJsonSchema = {
         votesReceived: { type: 'number' as const },
       },
     },
+    labels: {
+      type: 'array' as const,
+      items: {
+        type: 'object' as const,
+        properties: {
+          val: { type: 'string' as const },
+          src: { type: 'string' as const },
+          isSelfLabel: { type: 'boolean' as const },
+        },
+      },
+    },
   },
 }
 
@@ -375,6 +386,13 @@ export function profileRoutes(): FastifyPluginCallback {
           resolved = resolveProfile(sourceProfile, override)
         }
 
+        // Map stored labels to response format with isSelfLabel flag
+        const labels = user.atprotoLabels.map((l) => ({
+          val: l.val,
+          src: l.src,
+          isSelfLabel: l.src === user.did,
+        }))
+
         const globalActivity = {
           topicCount,
           replyCount,
@@ -398,6 +416,7 @@ export function profileRoutes(): FastifyPluginCallback {
           hasBlueskyProfile: user.hasBlueskyProfile,
           communityCount,
           activity: scopedActivity ?? globalActivity,
+          labels,
         }
 
         if (communityDid && communityCount >= 2) {

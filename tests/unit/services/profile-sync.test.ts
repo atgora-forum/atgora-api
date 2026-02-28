@@ -61,6 +61,29 @@ const MOCK_PROFILE_RESPONSE = {
     followersCount: 150,
     followsCount: 75,
     postsCount: 230,
+    labels: [
+      {
+        src: TEST_DID,
+        uri: `at://${TEST_DID}`,
+        val: 'adult-content',
+        neg: false,
+        cts: '2026-01-15T10:00:00.000Z',
+      },
+      {
+        src: 'did:plc:ozone-mod-service',
+        uri: `at://${TEST_DID}`,
+        val: '!warn',
+        neg: false,
+        cts: '2026-01-20T12:00:00.000Z',
+      },
+      {
+        src: TEST_DID,
+        uri: `at://${TEST_DID}`,
+        val: 'old-label',
+        neg: true,
+        cts: '2026-01-25T08:00:00.000Z',
+      },
+    ],
   },
 }
 
@@ -112,6 +135,15 @@ describe('ProfileSyncService', () => {
       followsCount: 75,
       atprotoPostsCount: 230,
       hasBlueskyProfile: true,
+      labels: [
+        { val: 'adult-content', src: TEST_DID, neg: false, cts: '2026-01-15T10:00:00.000Z' },
+        {
+          val: '!warn',
+          src: 'did:plc:ozone-mod-service',
+          neg: false,
+          cts: '2026-01-20T12:00:00.000Z',
+        },
+      ],
     })
   })
 
@@ -125,6 +157,32 @@ describe('ProfileSyncService', () => {
     await service.syncProfile(TEST_DID)
 
     expect(mockDb._mocks.updateFn).toHaveBeenCalled()
+  })
+
+  // -------------------------------------------------------------------------
+  // Label capture
+  // -------------------------------------------------------------------------
+
+  it('returns labels from profile, filtering out negated labels', async () => {
+    const result = await service.syncProfile(TEST_DID)
+
+    expect(result.labels).toStrictEqual([
+      { val: 'adult-content', src: TEST_DID, neg: false, cts: '2026-01-15T10:00:00.000Z' },
+      {
+        val: '!warn',
+        src: 'did:plc:ozone-mod-service',
+        neg: false,
+        cts: '2026-01-20T12:00:00.000Z',
+      },
+    ])
+  })
+
+  it('returns empty labels array when profile has no labels', async () => {
+    mockGetProfile.mockResolvedValue(MOCK_MINIMAL_PROFILE_RESPONSE)
+
+    const result = await service.syncProfile(TEST_DID)
+
+    expect(result.labels).toStrictEqual([])
   })
 
   // -------------------------------------------------------------------------
@@ -145,6 +203,7 @@ describe('ProfileSyncService', () => {
       followsCount: 0,
       atprotoPostsCount: 0,
       hasBlueskyProfile: true,
+      labels: [],
     })
   })
 
@@ -166,6 +225,7 @@ describe('ProfileSyncService', () => {
       followsCount: 0,
       atprotoPostsCount: 0,
       hasBlueskyProfile: false,
+      labels: [],
     })
   })
 
@@ -209,6 +269,15 @@ describe('ProfileSyncService', () => {
       followsCount: 75,
       atprotoPostsCount: 230,
       hasBlueskyProfile: true,
+      labels: [
+        { val: 'adult-content', src: TEST_DID, neg: false, cts: '2026-01-15T10:00:00.000Z' },
+        {
+          val: '!warn',
+          src: 'did:plc:ozone-mod-service',
+          neg: false,
+          cts: '2026-01-20T12:00:00.000Z',
+        },
+      ],
     })
   })
 
