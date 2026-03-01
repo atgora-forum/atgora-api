@@ -510,7 +510,7 @@ export function profileRoutes(): FastifyPluginCallback {
         let pdsTrustFactor = 0.3 // Default for unknown PDS
         try {
           const handleParts = user.handle.split('.')
-          // Extract host: "alice.bsky.social" -> "bsky.social", "alice.example.com" -> "example.com"
+          // Extract host: "jay.bsky.team" -> "bsky.team", "user.example.com" -> "example.com"
           const pdsHost = handleParts.length > 1 ? handleParts.slice(1).join('.') : user.handle
 
           const pdsRows = await db

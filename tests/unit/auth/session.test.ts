@@ -70,7 +70,7 @@ const defaultConfig: SessionConfig = {
 }
 
 const testDid = 'did:plc:test-user-123'
-const testHandle = 'alice.bsky.social'
+const testHandle = 'jay.bsky.team'
 
 /**
  * Build a mock persisted session (as stored in Valkey).

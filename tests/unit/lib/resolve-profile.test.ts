@@ -11,8 +11,8 @@ import {
 
 const baseSource: SourceProfile = {
   did: 'did:plc:abc123',
-  handle: 'alice.bsky.social',
-  displayName: 'Alice',
+  handle: 'jay.bsky.team',
+  displayName: 'Jay',
   avatarUrl: 'https://cdn.example.com/avatar.jpg',
   bannerUrl: 'https://cdn.example.com/banner.jpg',
   bio: 'Hello from the AT Protocol',
@@ -24,8 +24,8 @@ describe('resolveProfile', () => {
 
     expect(result).toEqual({
       did: 'did:plc:abc123',
-      handle: 'alice.bsky.social',
-      displayName: 'Alice',
+      handle: 'jay.bsky.team',
+      displayName: 'Jay',
       avatarUrl: 'https://cdn.example.com/avatar.jpg',
       bannerUrl: 'https://cdn.example.com/banner.jpg',
       bio: 'Hello from the AT Protocol',
@@ -34,7 +34,7 @@ describe('resolveProfile', () => {
 
   it('uses all override values when every field is set', () => {
     const override: CommunityOverride = {
-      displayName: 'Alice in Wonderland',
+      displayName: 'Jay in Wonderland',
       avatarUrl: 'https://cdn.example.com/community-avatar.jpg',
       bannerUrl: 'https://cdn.example.com/community-banner.jpg',
       bio: 'Community-specific bio',
@@ -44,8 +44,8 @@ describe('resolveProfile', () => {
 
     expect(result).toEqual({
       did: 'did:plc:abc123',
-      handle: 'alice.bsky.social',
-      displayName: 'Alice in Wonderland',
+      handle: 'jay.bsky.team',
+      displayName: 'Jay in Wonderland',
       avatarUrl: 'https://cdn.example.com/community-avatar.jpg',
       bannerUrl: 'https://cdn.example.com/community-banner.jpg',
       bio: 'Community-specific bio',
@@ -54,7 +54,7 @@ describe('resolveProfile', () => {
 
   it('falls back to source for null override fields', () => {
     const override: CommunityOverride = {
-      displayName: 'Community Alice',
+      displayName: 'Jay in the Community',
       avatarUrl: null,
       bannerUrl: null,
       bio: 'Override bio only',
@@ -64,8 +64,8 @@ describe('resolveProfile', () => {
 
     expect(result).toEqual({
       did: 'did:plc:abc123',
-      handle: 'alice.bsky.social',
-      displayName: 'Community Alice',
+      handle: 'jay.bsky.team',
+      displayName: 'Jay in the Community',
       avatarUrl: 'https://cdn.example.com/avatar.jpg',
       bannerUrl: 'https://cdn.example.com/banner.jpg',
       bio: 'Override bio only',

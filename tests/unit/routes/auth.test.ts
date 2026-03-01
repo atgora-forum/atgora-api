@@ -98,7 +98,7 @@ const mockHandleResolver: HandleResolver = {
 // ---------------------------------------------------------------------------
 
 const TEST_DID = 'did:plc:test123456789'
-const TEST_HANDLE = 'alice.bsky.social'
+const TEST_HANDLE = 'jay.bsky.team'
 const TEST_SID = 'a'.repeat(64)
 const TEST_ACCESS_TOKEN = 'b'.repeat(64)
 const TEST_ACCESS_TOKEN_HASH = 'c'.repeat(64)
@@ -182,13 +182,13 @@ describe('auth routes', () => {
 
       const response = await app.inject({
         method: 'GET',
-        url: '/api/auth/login?handle=alice.bsky.social',
+        url: '/api/auth/login?handle=jay.bsky.team',
       })
 
       expect(response.statusCode).toBe(200)
       const body = response.json<{ url: string }>()
       expect(body.url).toBe(redirectUrl.toString())
-      expect(authorizeFn).toHaveBeenCalledWith('alice.bsky.social', { scope: BARAZO_BASE_SCOPES })
+      expect(authorizeFn).toHaveBeenCalledWith('jay.bsky.team', { scope: BARAZO_BASE_SCOPES })
     })
 
     it('returns 400 for missing handle', async () => {
@@ -229,7 +229,7 @@ describe('auth routes', () => {
 
       const response = await app.inject({
         method: 'GET',
-        url: '/api/auth/login?handle=alice.bsky.social',
+        url: '/api/auth/login?handle=jay.bsky.team',
       })
 
       expect(response.statusCode).toBe(502)
@@ -391,7 +391,7 @@ describe('auth routes', () => {
       refreshSessionFn.mockResolvedValueOnce(mockSession)
       // First select: users table → profile data
       dbWhereFn.mockResolvedValueOnce([
-        { displayName: 'Alice Wonderland', avatarUrl: 'https://cdn.bsky.app/avatar.jpg' },
+        { displayName: 'Jay Graber', avatarUrl: 'https://cdn.bsky.app/avatar.jpg' },
       ])
       // Second select: userPreferences table
       dbWhereFn.mockResolvedValueOnce([])
@@ -404,7 +404,7 @@ describe('auth routes', () => {
 
       expect(response.statusCode).toBe(200)
       const body = response.json<{ displayName: string | null; avatarUrl: string | null }>()
-      expect(body.displayName).toBe('Alice Wonderland')
+      expect(body.displayName).toBe('Jay Graber')
       expect(body.avatarUrl).toBe('https://cdn.bsky.app/avatar.jpg')
     })
 
@@ -524,7 +524,7 @@ describe('auth routes', () => {
       validateAccessTokenFn.mockResolvedValueOnce(mockSession)
       // First select: users table → profile data
       dbWhereFn.mockResolvedValueOnce([
-        { displayName: 'Alice Wonderland', avatarUrl: 'https://cdn.bsky.app/avatar.jpg' },
+        { displayName: 'Jay Graber', avatarUrl: 'https://cdn.bsky.app/avatar.jpg' },
       ])
       // Second select: userPreferences table
       dbWhereFn.mockResolvedValueOnce([])
@@ -537,7 +537,7 @@ describe('auth routes', () => {
 
       expect(response.statusCode).toBe(200)
       const body = response.json<{ displayName: string | null; avatarUrl: string | null }>()
-      expect(body.displayName).toBe('Alice Wonderland')
+      expect(body.displayName).toBe('Jay Graber')
       expect(body.avatarUrl).toBe('https://cdn.bsky.app/avatar.jpg')
     })
 
@@ -653,7 +653,7 @@ describe('auth routes', () => {
 
       const response = await app.inject({
         method: 'GET',
-        url: '/api/auth/login?handle=alice.bsky.social',
+        url: '/api/auth/login?handle=jay.bsky.team',
       })
 
       expect(response.statusCode).toBe(200)
@@ -661,11 +661,11 @@ describe('auth routes', () => {
       expect(body.url).toBe(fallbackUrl.toString())
 
       // First call with granular scopes
-      expect(authorizeFn).toHaveBeenNthCalledWith(1, 'alice.bsky.social', {
+      expect(authorizeFn).toHaveBeenNthCalledWith(1, 'jay.bsky.team', {
         scope: BARAZO_BASE_SCOPES,
       })
       // Second call with fallback
-      expect(authorizeFn).toHaveBeenNthCalledWith(2, 'alice.bsky.social', { scope: FALLBACK_SCOPE })
+      expect(authorizeFn).toHaveBeenNthCalledWith(2, 'jay.bsky.team', { scope: FALLBACK_SCOPE })
     })
 
     it('requests cross-post scopes when crosspost=true', async () => {
@@ -674,11 +674,11 @@ describe('auth routes', () => {
 
       const response = await app.inject({
         method: 'GET',
-        url: '/api/auth/login?handle=alice.bsky.social&crosspost=true',
+        url: '/api/auth/login?handle=jay.bsky.team&crosspost=true',
       })
 
       expect(response.statusCode).toBe(200)
-      expect(authorizeFn).toHaveBeenCalledWith('alice.bsky.social', {
+      expect(authorizeFn).toHaveBeenCalledWith('jay.bsky.team', {
         scope: BARAZO_CROSSPOST_SCOPES,
       })
     })

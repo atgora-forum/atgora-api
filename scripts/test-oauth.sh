@@ -14,7 +14,7 @@
 #   chmod +x scripts/test-oauth.sh
 #   ./scripts/test-oauth.sh [handle]
 #
-#   handle: Your Bluesky handle (e.g. alice.bsky.social). If omitted,
+#   handle: Your Bluesky handle (e.g. jay.bsky.team). If omitted,
 #           the script will prompt for it.
 # ---------------------------------------------------------------------------
 set -euo pipefail
@@ -189,7 +189,7 @@ step "OAuth Login Flow"
 
 HANDLE="${1:-}"
 if [ -z "$HANDLE" ]; then
-  echo -en "\n  ${BOLD}Enter your Bluesky handle${RESET} (e.g. alice.bsky.social): "
+  echo -en "\n  ${BOLD}Enter your Bluesky handle${RESET} (e.g. jay.bsky.team): "
   read -r HANDLE
 fi
 

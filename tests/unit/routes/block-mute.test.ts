@@ -26,7 +26,7 @@ const mockEnv = {
 // ---------------------------------------------------------------------------
 
 const TEST_DID = 'did:plc:testuser123'
-const TEST_HANDLE = 'alice.bsky.social'
+const TEST_HANDLE = 'jay.bsky.team'
 const TEST_SID = 'a'.repeat(64)
 const TARGET_DID = 'did:plc:targetuser456'
 const INVALID_DID = 'not-a-did'
