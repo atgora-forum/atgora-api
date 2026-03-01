@@ -43,6 +43,7 @@ const profileJsonSchema = {
     followsCount: { type: 'number' as const },
     atprotoPostsCount: { type: 'number' as const },
     hasBlueskyProfile: { type: 'boolean' as const },
+    accountCreatedAt: { type: ['string', 'null'] as const, format: 'date-time' as const },
     communityCount: { type: 'number' as const },
     activity: {
       type: 'object' as const,
@@ -416,6 +417,7 @@ export function profileRoutes(): FastifyPluginCallback {
           followsCount: user.followsCount,
           atprotoPostsCount: user.atprotoPostsCount,
           hasBlueskyProfile: user.hasBlueskyProfile,
+          accountCreatedAt: user.accountCreatedAt?.toISOString() ?? null,
           communityCount,
           activity: scopedActivity ?? globalActivity,
           labels,
