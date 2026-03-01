@@ -63,6 +63,7 @@ function sampleUserRow(overrides?: Record<string, unknown>) {
     lastActiveAt: new Date(TEST_NOW),
     declaredAge: null,
     maturityPref: 'safe',
+    accountCreatedAt: null,
     followersCount: 0,
     followsCount: 0,
     atprotoPostsCount: 0,
@@ -339,6 +340,51 @@ describe('profile routes', () => {
       expect(body.atprotoPostsCount).toBe(0)
       expect(body.hasBlueskyProfile).toBe(false)
       expect(body.communityCount).toBe(1)
+    })
+
+    it('includes accountCreatedAt when user has one', async () => {
+      const accountCreatedAt = new Date('2024-06-15T10:30:00.000Z')
+      selectChain.where.mockResolvedValueOnce([sampleUserRow({ accountCreatedAt })])
+      // topic count, reply count, reactions on topics, reactions on replies, votes on topics, votes on replies
+      selectChain.where.mockResolvedValueOnce([{ count: 0 }])
+      selectChain.where.mockResolvedValueOnce([{ count: 0 }])
+      selectChain.where.mockResolvedValueOnce([{ count: 0 }])
+      selectChain.where.mockResolvedValueOnce([{ count: 0 }])
+      selectChain.where.mockResolvedValueOnce([{ count: 0 }])
+      selectChain.where.mockResolvedValueOnce([{ count: 0 }])
+      // communityCount
+      selectDistinctChain.where.mockResolvedValueOnce([])
+      selectDistinctChain.where.mockResolvedValueOnce([])
+
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/users/${TEST_HANDLE}`,
+      })
+
+      expect(response.statusCode).toBe(200)
+      const body = response.json<{ accountCreatedAt: string | null }>()
+      expect(body.accountCreatedAt).toBe('2024-06-15T10:30:00.000Z')
+    })
+
+    it('returns null accountCreatedAt when user has none', async () => {
+      selectChain.where.mockResolvedValueOnce([sampleUserRow({ accountCreatedAt: null })])
+      selectChain.where.mockResolvedValueOnce([{ count: 0 }])
+      selectChain.where.mockResolvedValueOnce([{ count: 0 }])
+      selectChain.where.mockResolvedValueOnce([{ count: 0 }])
+      selectChain.where.mockResolvedValueOnce([{ count: 0 }])
+      selectChain.where.mockResolvedValueOnce([{ count: 0 }])
+      selectChain.where.mockResolvedValueOnce([{ count: 0 }])
+      selectDistinctChain.where.mockResolvedValueOnce([])
+      selectDistinctChain.where.mockResolvedValueOnce([])
+
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/users/${TEST_HANDLE}`,
+      })
+
+      expect(response.statusCode).toBe(200)
+      const body = response.json<{ accountCreatedAt: string | null }>()
+      expect(body.accountCreatedAt).toBeNull()
     })
 
     it('returns null for bannerUrl and bio when not set', async () => {
