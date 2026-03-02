@@ -57,7 +57,7 @@ const VALID_TOKEN = 'a'.repeat(64)
 const VALID_SESSION: Session = {
   sid: 's'.repeat(64),
   did: 'did:plc:abc123',
-  handle: 'alice.bsky.social',
+  handle: 'jay.bsky.team',
   accessTokenHash: 'h'.repeat(64),
   accessTokenExpiresAt: Date.now() + 900_000,
   createdAt: Date.now() - 60_000,

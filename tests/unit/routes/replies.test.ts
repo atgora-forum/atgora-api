@@ -85,7 +85,7 @@ const mockEnv = {
 // ---------------------------------------------------------------------------
 
 const TEST_DID = 'did:plc:testuser123'
-const TEST_HANDLE = 'alice.bsky.social'
+const TEST_HANDLE = 'jay.bsky.team'
 const TEST_SID = 'a'.repeat(64)
 
 const TEST_TOPIC_URI = `at://${TEST_DID}/forum.barazo.topic.post/abc123`
@@ -1007,15 +1007,15 @@ describe('reply routes', () => {
         {
           did: TEST_DID,
           handle: TEST_HANDLE,
-          displayName: 'Alice',
-          avatarUrl: 'https://cdn.example.com/alice.jpg',
+          displayName: 'Jay',
+          avatarUrl: 'https://cdn.example.com/jay.jpg',
           bannerUrl: null,
           bio: null,
         },
         {
           did: OTHER_DID,
-          handle: 'bob.bsky.social',
-          displayName: 'Bob',
+          handle: 'alex.bsky.team',
+          displayName: 'Alex',
           avatarUrl: null,
           bannerUrl: null,
           bio: null,
@@ -1044,19 +1044,19 @@ describe('reply routes', () => {
       expect(body.replies).toHaveLength(2)
 
       // Verify resolved author profile data (not just DID fallback)
-      const aliceReply = body.replies.find((r) => r.authorDid === TEST_DID)
-      expect(aliceReply?.author).toEqual({
+      const jayReply = body.replies.find((r) => r.authorDid === TEST_DID)
+      expect(jayReply?.author).toEqual({
         did: TEST_DID,
         handle: TEST_HANDLE,
-        displayName: 'Alice',
-        avatarUrl: 'https://cdn.example.com/alice.jpg',
+        displayName: 'Jay',
+        avatarUrl: 'https://cdn.example.com/jay.jpg',
       })
 
-      const bobReply = body.replies.find((r) => r.authorDid === OTHER_DID)
-      expect(bobReply?.author).toEqual({
+      const alexReply = body.replies.find((r) => r.authorDid === OTHER_DID)
+      expect(alexReply?.author).toEqual({
         did: OTHER_DID,
-        handle: 'bob.bsky.social',
-        displayName: 'Bob',
+        handle: 'alex.bsky.team',
+        displayName: 'Alex',
         avatarUrl: null,
       })
     })
@@ -2044,7 +2044,7 @@ describe('reply routes', () => {
         {
           did: TEST_DID,
           handle: TEST_HANDLE,
-          displayName: 'Alice',
+          displayName: 'Jay',
           avatarUrl: null,
           bannerUrl: null,
           bio: null,

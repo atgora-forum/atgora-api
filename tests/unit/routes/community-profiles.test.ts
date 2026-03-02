@@ -26,7 +26,7 @@ const mockEnv = {
 // ---------------------------------------------------------------------------
 
 const TEST_DID = 'did:plc:testuser123'
-const TEST_HANDLE = 'alice.bsky.social'
+const TEST_HANDLE = 'jay.bsky.team'
 const TEST_SID = 'a'.repeat(64)
 const COMMUNITY_DID = 'did:plc:community456'
 const TEST_NOW = '2026-02-14T12:00:00.000Z'
@@ -52,7 +52,7 @@ function sampleUserRow(overrides?: Record<string, unknown>) {
   return {
     did: TEST_DID,
     handle: TEST_HANDLE,
-    displayName: 'Alice',
+    displayName: 'Jay',
     avatarUrl: 'https://example.com/avatar.jpg',
     bannerUrl: 'https://example.com/banner.jpg',
     bio: 'Global bio',
@@ -71,7 +71,7 @@ function sampleOverrideRow(overrides?: Record<string, unknown>) {
   return {
     did: TEST_DID,
     communityDid: COMMUNITY_DID,
-    displayName: 'Community Alice',
+    displayName: 'Jay in the Community',
     avatarUrl: null,
     bannerUrl: null,
     bio: 'Community-specific bio',
@@ -201,13 +201,13 @@ describe('community profile routes', () => {
       }>()
       expect(body.did).toBe(TEST_DID)
       expect(body.handle).toBe(TEST_HANDLE)
-      expect(body.displayName).toBe('Alice')
+      expect(body.displayName).toBe('Jay')
       expect(body.avatarUrl).toBe('https://example.com/avatar.jpg')
       expect(body.bannerUrl).toBe('https://example.com/banner.jpg')
       expect(body.bio).toBe('Global bio')
       expect(body.communityDid).toBe(COMMUNITY_DID)
       expect(body.hasOverride).toBe(false)
-      expect(body.source.displayName).toBe('Alice')
+      expect(body.source.displayName).toBe('Jay')
       expect(body.source.avatarUrl).toBe('https://example.com/avatar.jpg')
     })
 
@@ -241,14 +241,14 @@ describe('community profile routes', () => {
         }
       }>()
       // Override fields take precedence
-      expect(body.displayName).toBe('Community Alice')
+      expect(body.displayName).toBe('Jay in the Community')
       expect(body.bio).toBe('Community-specific bio')
       // Null override fields fall back to source
       expect(body.avatarUrl).toBe('https://example.com/avatar.jpg')
       expect(body.bannerUrl).toBe('https://example.com/banner.jpg')
       expect(body.hasOverride).toBe(true)
       // Source always shows original values
-      expect(body.source.displayName).toBe('Alice')
+      expect(body.source.displayName).toBe('Jay')
       expect(body.source.bio).toBe('Global bio')
     })
 
@@ -304,7 +304,7 @@ describe('community profile routes', () => {
         url: `/api/communities/${COMMUNITY_DID}/profile`,
         headers: { authorization: 'Bearer test-token' },
         payload: {
-          displayName: 'Community Alice',
+          displayName: 'Jay in the Community',
           bio: 'Community-specific bio',
         },
       })

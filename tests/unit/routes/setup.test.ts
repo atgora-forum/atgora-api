@@ -34,7 +34,7 @@ const mockSessionService: SessionService = {
 // ---------------------------------------------------------------------------
 
 const TEST_DID = 'did:plc:test123456789'
-const TEST_HANDLE = 'alice.bsky.social'
+const TEST_HANDLE = 'jay.bsky.team'
 const TEST_SID = 's'.repeat(64)
 const TEST_ACCESS_TOKEN = 'a'.repeat(64)
 

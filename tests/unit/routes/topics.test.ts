@@ -108,7 +108,7 @@ const mockEnv = {
 // ---------------------------------------------------------------------------
 
 const TEST_DID = 'did:plc:testuser123'
-const TEST_HANDLE = 'alice.bsky.social'
+const TEST_HANDLE = 'jay.bsky.team'
 const TEST_SID = 'a'.repeat(64)
 const TEST_URI = `at://${TEST_DID}/forum.barazo.topic.post/abc123`
 const TEST_RKEY = 'abc123'
@@ -888,8 +888,8 @@ describe('topic routes', () => {
         {
           did: TEST_DID,
           handle: TEST_HANDLE,
-          displayName: 'Alice',
-          avatarUrl: 'https://cdn.example.com/alice.jpg',
+          displayName: 'Jay',
+          avatarUrl: 'https://cdn.example.com/jay.jpg',
           bannerUrl: null,
           bio: null,
         },
@@ -906,8 +906,8 @@ describe('topic routes', () => {
       expect(body.topics[0].author).toEqual({
         did: TEST_DID,
         handle: TEST_HANDLE,
-        displayName: 'Alice',
-        avatarUrl: 'https://cdn.example.com/alice.jpg',
+        displayName: 'Jay',
+        avatarUrl: 'https://cdn.example.com/jay.jpg',
       })
     })
   })
@@ -3360,7 +3360,7 @@ describe('topic routes', () => {
         {
           did: TEST_DID,
           handle: TEST_HANDLE,
-          displayName: 'Alice',
+          displayName: 'Jay',
           avatarUrl: null,
           bannerUrl: null,
           bio: null,

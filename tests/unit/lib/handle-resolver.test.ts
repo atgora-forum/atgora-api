@@ -33,7 +33,7 @@ const mockLogger = {
 // ---------------------------------------------------------------------------
 
 const TEST_DID = 'did:plc:test123456789'
-const TEST_HANDLE = 'alice.bsky.social'
+const TEST_HANDLE = 'jay.bsky.team'
 
 // ---------------------------------------------------------------------------
 // Test suite

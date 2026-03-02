@@ -26,7 +26,7 @@ const mockEnv = {
 // ---------------------------------------------------------------------------
 
 const TEST_DID = 'did:plc:testuser123'
-const TEST_HANDLE = 'alice.bsky.social'
+const TEST_HANDLE = 'jay.bsky.team'
 const TEST_SID = 'a'.repeat(64)
 const COMMUNITY_DID = 'did:plc:community123'
 const TEST_NOW = '2026-02-14T12:00:00.000Z'
@@ -52,10 +52,10 @@ function sampleUserRow(overrides?: Record<string, unknown>) {
   return {
     did: TEST_DID,
     handle: TEST_HANDLE,
-    displayName: 'Alice',
+    displayName: 'Jay',
     avatarUrl: 'https://example.com/avatar.jpg',
     bannerUrl: 'https://example.com/banner.jpg',
-    bio: 'Hello, I am Alice',
+    bio: 'Hello, I am Jay',
     role: 'user',
     isBanned: false,
     reputationScore: 0,
@@ -338,9 +338,9 @@ describe('profile routes', () => {
       }>()
       expect(body.did).toBe(TEST_DID)
       expect(body.handle).toBe(TEST_HANDLE)
-      expect(body.displayName).toBe('Alice')
+      expect(body.displayName).toBe('Jay')
       expect(body.bannerUrl).toBe('https://example.com/banner.jpg')
-      expect(body.bio).toBe('Hello, I am Alice')
+      expect(body.bio).toBe('Hello, I am Jay')
       expect(body.role).toBe('user')
       expect(body.activity.topicCount).toBe(5)
       expect(body.activity.replyCount).toBe(10)
@@ -454,7 +454,7 @@ describe('profile routes', () => {
         {
           did: TEST_DID,
           communityDid: COMMUNITY_DID,
-          displayName: 'Community Alice',
+          displayName: 'Jay in the Community',
           avatarUrl: null,
           bannerUrl: 'https://example.com/community-banner.jpg',
           bio: null,
@@ -477,11 +477,11 @@ describe('profile routes', () => {
         bio: string | null
       }>()
       // Community override takes precedence for displayName and bannerUrl
-      expect(body.displayName).toBe('Community Alice')
+      expect(body.displayName).toBe('Jay in the Community')
       expect(body.bannerUrl).toBe('https://example.com/community-banner.jpg')
       // Falls back to source for avatarUrl and bio (override is null)
       expect(body.avatarUrl).toBe('https://example.com/avatar.jpg')
-      expect(body.bio).toBe('Hello, I am Alice')
+      expect(body.bio).toBe('Hello, I am Jay')
     })
 
     it('returns source profile when communityDid has no override row', async () => {
@@ -520,9 +520,9 @@ describe('profile routes', () => {
         bio: string | null
       }>()
       // Falls back to source values
-      expect(body.displayName).toBe('Alice')
+      expect(body.displayName).toBe('Jay')
       expect(body.bannerUrl).toBe('https://example.com/banner.jpg')
-      expect(body.bio).toBe('Hello, I am Alice')
+      expect(body.bio).toBe('Hello, I am Jay')
     })
 
     it('returns 404 for unknown handle', async () => {

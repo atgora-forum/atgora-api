@@ -53,8 +53,8 @@ const MOCK_PROFILE_RESPONSE = {
   success: true,
   data: {
     did: TEST_DID,
-    handle: 'alice.bsky.social',
-    displayName: 'Alice Wonderland',
+    handle: 'jay.bsky.team',
+    displayName: 'Jay',
     avatar: 'https://cdn.bsky.app/img/avatar/plain/did:plc:testuser123456789012/bafkreiabc@jpeg',
     banner: 'https://cdn.bsky.app/img/banner/plain/did:plc:testuser123456789012/bafkreixyz@jpeg',
     description: 'Exploring the decentralized web.',
@@ -91,7 +91,7 @@ const MOCK_MINIMAL_PROFILE_RESPONSE = {
   success: true,
   data: {
     did: TEST_DID,
-    handle: 'bob.bsky.social',
+    handle: 'alex.bsky.team',
   },
 }
 
@@ -125,7 +125,7 @@ describe('ProfileSyncService', () => {
     const result = await service.syncProfile(TEST_DID)
 
     expect(result).toStrictEqual({
-      displayName: 'Alice Wonderland',
+      displayName: 'Jay',
       avatarUrl:
         'https://cdn.bsky.app/img/avatar/plain/did:plc:testuser123456789012/bafkreiabc@jpeg',
       bannerUrl:
@@ -259,7 +259,7 @@ describe('ProfileSyncService', () => {
     const result = await service.syncProfile(TEST_DID)
 
     expect(result).toStrictEqual({
-      displayName: 'Alice Wonderland',
+      displayName: 'Jay',
       avatarUrl:
         'https://cdn.bsky.app/img/avatar/plain/did:plc:testuser123456789012/bafkreiabc@jpeg',
       bannerUrl:
@@ -336,12 +336,12 @@ describe('ProfileSyncService', () => {
       success: true,
       data: {
         ...MOCK_PROFILE_RESPONSE.data,
-        displayName: 'Alice\u200BWonderland',
+        displayName: 'J\u200Bay',
       },
     })
 
     const result = await service.syncProfile(TEST_DID)
-    expect(result.displayName).toBe('AliceWonderland')
+    expect(result.displayName).toBe('Jay')
   })
 
   it('returns null displayName when name is all control characters', async () => {

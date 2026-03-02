@@ -79,7 +79,7 @@ const mockEnv = {
 // ---------------------------------------------------------------------------
 
 const TEST_DID = 'did:plc:testuser123'
-const TEST_HANDLE = 'alice.bsky.social'
+const TEST_HANDLE = 'jay.bsky.team'
 const TEST_SID = 'a'.repeat(64)
 
 const TEST_TOPIC_URI = `at://${TEST_DID}/forum.barazo.topic.post/topic001`

@@ -17,8 +17,8 @@ function createMockDb(
 }
 
 describe('resolveAuthors', () => {
-  const didAlice = 'did:plc:alice111'
-  const didBob = 'did:plc:bob222'
+  const didJay = 'did:plc:jay111'
+  const didAlex = 'did:plc:alex222'
   const communityDid = 'did:plc:community123'
 
   it('returns empty map for empty DID list', async () => {
@@ -32,16 +32,16 @@ describe('resolveAuthors', () => {
     const db = createMockDb(
       [
         {
-          did: didAlice,
-          handle: 'alice.bsky.social',
-          displayName: 'Alice',
-          avatarUrl: 'https://cdn.example.com/alice.jpg',
+          did: didJay,
+          handle: 'jay.bsky.team',
+          displayName: 'Jay',
+          avatarUrl: 'https://cdn.example.com/jay.jpg',
           bannerUrl: null,
           bio: null,
         },
         {
-          did: didBob,
-          handle: 'bob.bsky.social',
+          did: didAlex,
+          handle: 'alex.bsky.team',
           displayName: null,
           avatarUrl: null,
           bannerUrl: null,
@@ -51,18 +51,18 @@ describe('resolveAuthors', () => {
       []
     )
 
-    const result = await resolveAuthors([didAlice, didBob], null, db as never)
+    const result = await resolveAuthors([didJay, didAlex], null, db as never)
 
     expect(result.size).toBe(2)
-    expect(result.get(didAlice)).toEqual({
-      did: didAlice,
-      handle: 'alice.bsky.social',
-      displayName: 'Alice',
-      avatarUrl: 'https://cdn.example.com/alice.jpg',
+    expect(result.get(didJay)).toEqual({
+      did: didJay,
+      handle: 'jay.bsky.team',
+      displayName: 'Jay',
+      avatarUrl: 'https://cdn.example.com/jay.jpg',
     })
-    expect(result.get(didBob)).toEqual({
-      did: didBob,
-      handle: 'bob.bsky.social',
+    expect(result.get(didAlex)).toEqual({
+      did: didAlex,
+      handle: 'alex.bsky.team',
       displayName: null,
       avatarUrl: null,
     })
@@ -72,33 +72,33 @@ describe('resolveAuthors', () => {
     const db = createMockDb(
       [
         {
-          did: didAlice,
-          handle: 'alice.bsky.social',
-          displayName: 'Alice',
-          avatarUrl: 'https://cdn.example.com/alice.jpg',
+          did: didJay,
+          handle: 'jay.bsky.team',
+          displayName: 'Jay',
+          avatarUrl: 'https://cdn.example.com/jay.jpg',
           bannerUrl: null,
           bio: null,
         },
       ],
       [
         {
-          did: didAlice,
+          did: didJay,
           communityDid,
-          displayName: 'Alice in Community',
-          avatarUrl: 'https://cdn.example.com/alice-community.jpg',
+          displayName: 'Jay in Community',
+          avatarUrl: 'https://cdn.example.com/jay-community.jpg',
           bannerUrl: null,
           bio: null,
         },
       ]
     )
 
-    const result = await resolveAuthors([didAlice], communityDid, db as never)
+    const result = await resolveAuthors([didJay], communityDid, db as never)
 
-    expect(result.get(didAlice)).toEqual({
-      did: didAlice,
-      handle: 'alice.bsky.social',
-      displayName: 'Alice in Community',
-      avatarUrl: 'https://cdn.example.com/alice-community.jpg',
+    expect(result.get(didJay)).toEqual({
+      did: didJay,
+      handle: 'jay.bsky.team',
+      displayName: 'Jay in Community',
+      avatarUrl: 'https://cdn.example.com/jay-community.jpg',
     })
   })
 
@@ -106,9 +106,9 @@ describe('resolveAuthors', () => {
     const db = createMockDb(
       [
         {
-          did: didAlice,
-          handle: 'alice.bsky.social',
-          displayName: 'Alice',
+          did: didJay,
+          handle: 'jay.bsky.team',
+          displayName: 'Jay',
           avatarUrl: null,
           bannerUrl: null,
           bio: null,
@@ -117,7 +117,7 @@ describe('resolveAuthors', () => {
       []
     )
 
-    const result = await resolveAuthors([didAlice, didAlice, didAlice], null, db as never)
+    const result = await resolveAuthors([didJay, didJay, didJay], null, db as never)
 
     expect(result.size).toBe(1)
   })
@@ -125,11 +125,11 @@ describe('resolveAuthors', () => {
   it('returns fallback for DIDs not found in users table', async () => {
     const db = createMockDb([], [])
 
-    const result = await resolveAuthors([didAlice], null, db as never)
+    const result = await resolveAuthors([didJay], null, db as never)
 
-    expect(result.get(didAlice)).toEqual({
-      did: didAlice,
-      handle: didAlice,
+    expect(result.get(didJay)).toEqual({
+      did: didJay,
+      handle: didJay,
       displayName: null,
       avatarUrl: null,
     })

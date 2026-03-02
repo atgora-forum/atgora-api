@@ -54,18 +54,18 @@ beforeEach(() => {
 
 describe('extractMentions', () => {
   it('extracts single AT Protocol handle', () => {
-    const result = extractMentions('Hello @alice.bsky.social, welcome!')
-    expect(result).toEqual(['alice.bsky.social'])
+    const result = extractMentions('Hello @jay.bsky.team, welcome!')
+    expect(result).toEqual(['jay.bsky.team'])
   })
 
   it('extracts multiple handles', () => {
-    const result = extractMentions('cc @alice.bsky.social @bob.example.com')
-    expect(result).toEqual(['alice.bsky.social', 'bob.example.com'])
+    const result = extractMentions('cc @jay.bsky.team @alex.example.com')
+    expect(result).toEqual(['jay.bsky.team', 'alex.example.com'])
   })
 
   it('deduplicates handles (case-insensitive)', () => {
-    const result = extractMentions('@Alice.Bsky.Social and @alice.bsky.social')
-    expect(result).toEqual(['alice.bsky.social'])
+    const result = extractMentions('@Jay.Bsky.Team and @jay.bsky.team')
+    expect(result).toEqual(['jay.bsky.team'])
   })
 
   it('ignores bare @word without a dot', () => {
@@ -303,7 +303,7 @@ describe('notifyOnMentions', () => {
   it('resolves handles to DIDs and creates mention notifications', async () => {
     // Select: resolve handles
     const userSelectChain = createChainableProxy([
-      { did: 'did:plc:mentioned1', handle: 'alice.bsky.social' },
+      { did: 'did:plc:mentioned1', handle: 'jay.bsky.team' },
     ])
     mockDb.select.mockReturnValue(userSelectChain)
 
@@ -311,7 +311,7 @@ describe('notifyOnMentions', () => {
     mockDb.insert.mockReturnValue(insertChain)
 
     await service.notifyOnMentions({
-      content: 'Hey @alice.bsky.social check this out',
+      content: 'Hey @jay.bsky.team check this out',
       subjectUri: REPLY_URI,
       actorDid: ACTOR_DID,
       communityDid: COMMUNITY_DID,

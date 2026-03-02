@@ -49,7 +49,7 @@ const TEST_DID_WEB = 'did:web:example.com'
 function activeDidDoc() {
   return {
     id: TEST_DID,
-    alsoKnownAs: ['at://alice.bsky.social'],
+    alsoKnownAs: ['at://jay.bsky.team'],
     verificationMethods: { atproto: 'did:key:z123' },
     rotationKeys: ['did:key:z456'],
     services: {

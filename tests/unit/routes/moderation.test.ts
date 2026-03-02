@@ -37,7 +37,7 @@ const mockEnv = {
 // ---------------------------------------------------------------------------
 
 const TEST_DID = 'did:plc:testuser123'
-const TEST_HANDLE = 'alice.bsky.social'
+const TEST_HANDLE = 'jay.bsky.team'
 const TEST_SID = 'a'.repeat(64)
 const ADMIN_DID = 'did:plc:admin999'
 const OTHER_DID = 'did:plc:otheruser456'
@@ -206,8 +206,8 @@ function sampleReplyRow(overrides?: Record<string, unknown>) {
 function sampleUserRow(overrides?: Record<string, unknown>) {
   return {
     did: OTHER_DID,
-    handle: 'bob.bsky.social',
-    displayName: 'Bob',
+    handle: 'alex.bsky.team',
+    displayName: 'Alex',
     avatarUrl: null,
     role: 'user',
     isBanned: false,
