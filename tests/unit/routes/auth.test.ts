@@ -391,7 +391,7 @@ describe('auth routes', () => {
       refreshSessionFn.mockResolvedValueOnce(mockSession)
       // First select: users table → profile data
       dbWhereFn.mockResolvedValueOnce([
-        { displayName: 'Jay Graber', avatarUrl: 'https://cdn.bsky.app/avatar.jpg' },
+        { displayName: 'Jay', avatarUrl: 'https://cdn.bsky.app/avatar.jpg' },
       ])
       // Second select: userPreferences table
       dbWhereFn.mockResolvedValueOnce([])
@@ -404,7 +404,7 @@ describe('auth routes', () => {
 
       expect(response.statusCode).toBe(200)
       const body = response.json<{ displayName: string | null; avatarUrl: string | null }>()
-      expect(body.displayName).toBe('Jay Graber')
+      expect(body.displayName).toBe('Jay')
       expect(body.avatarUrl).toBe('https://cdn.bsky.app/avatar.jpg')
     })
 
@@ -524,7 +524,7 @@ describe('auth routes', () => {
       validateAccessTokenFn.mockResolvedValueOnce(mockSession)
       // First select: users table → profile data
       dbWhereFn.mockResolvedValueOnce([
-        { displayName: 'Jay Graber', avatarUrl: 'https://cdn.bsky.app/avatar.jpg' },
+        { displayName: 'Jay', avatarUrl: 'https://cdn.bsky.app/avatar.jpg' },
       ])
       // Second select: userPreferences table
       dbWhereFn.mockResolvedValueOnce([])
@@ -537,7 +537,7 @@ describe('auth routes', () => {
 
       expect(response.statusCode).toBe(200)
       const body = response.json<{ displayName: string | null; avatarUrl: string | null }>()
-      expect(body.displayName).toBe('Jay Graber')
+      expect(body.displayName).toBe('Jay')
       expect(body.avatarUrl).toBe('https://cdn.bsky.app/avatar.jpg')
     })
 
