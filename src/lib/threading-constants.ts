@@ -1,0 +1,3 @@
+export const MAX_REPLY_DEPTH_DEFAULT = 9999
+export const MAX_DEPTH_QUERY_PARAM = 100
+export const DEFAULT_DEPTH_QUERY_PARAM = 10
