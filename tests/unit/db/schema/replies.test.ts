@@ -30,6 +30,7 @@ describe('replies schema', () => {
       'cid',
       'labels',
       'reactionCount',
+      'depth',
       'createdAt',
       'indexedAt',
       // Note: search_vector (tsvector) and embedding (vector) columns exist
@@ -61,6 +62,11 @@ describe('replies schema', () => {
 
   it('has default value for reaction count', () => {
     expect(columns.reactionCount.hasDefault).toBe(true)
+  })
+
+  it('has depth column with notNull and default value', () => {
+    expect(columns.depth.notNull).toBe(true)
+    expect(columns.depth.hasDefault).toBe(true)
   })
 
   it('has default value for indexed_at', () => {
