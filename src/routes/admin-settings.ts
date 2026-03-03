@@ -26,6 +26,7 @@ const settingsJsonSchema = {
     accentColor: { type: ['string', 'null'] as const },
     jurisdictionCountry: { type: ['string', 'null'] as const },
     ageThreshold: { type: 'integer' as const },
+    maxReplyDepth: { type: 'integer' as const },
     requireLoginForMature: { type: 'boolean' as const },
     createdAt: { type: 'string' as const, format: 'date-time' as const },
     updatedAt: { type: 'string' as const, format: 'date-time' as const },
@@ -90,6 +91,7 @@ function serializeSettings(row: typeof communitySettings.$inferSelect) {
     accentColor: row.accentColor ?? null,
     jurisdictionCountry: row.jurisdictionCountry ?? null,
     ageThreshold: row.ageThreshold,
+    maxReplyDepth: row.maxReplyDepth,
     requireLoginForMature: row.requireLoginForMature,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -131,6 +133,7 @@ export function adminSettingsRoutes(): FastifyPluginCallback {
                 maturityRating: { type: 'string' as const, enum: ['safe', 'mature', 'adult'] },
                 communityDescription: { type: ['string', 'null'] as const },
                 communityLogoUrl: { type: ['string', 'null'] as const },
+                maxReplyDepth: { type: 'integer' as const },
               },
             },
             404: errorResponseSchema,
@@ -155,6 +158,7 @@ export function adminSettingsRoutes(): FastifyPluginCallback {
           maturityRating: row.maturityRating,
           communityDescription: row.communityDescription ?? null,
           communityLogoUrl: row.communityLogoUrl ?? null,
+          maxReplyDepth: row.maxReplyDepth,
         })
       }
     )
@@ -229,6 +233,7 @@ export function adminSettingsRoutes(): FastifyPluginCallback {
               },
               jurisdictionCountry: { type: ['string', 'null'] },
               ageThreshold: { type: 'integer', minimum: 13, maximum: 18 },
+              maxReplyDepth: { type: 'integer', minimum: 1, maximum: 9999 },
               requireLoginForMature: { type: 'boolean' },
             },
           },
@@ -262,6 +267,7 @@ export function adminSettingsRoutes(): FastifyPluginCallback {
           updates.accentColor === undefined &&
           updates.jurisdictionCountry === undefined &&
           updates.ageThreshold === undefined &&
+          updates.maxReplyDepth === undefined &&
           updates.requireLoginForMature === undefined
         ) {
           throw badRequest('At least one field must be provided')
@@ -349,6 +355,9 @@ export function adminSettingsRoutes(): FastifyPluginCallback {
         }
         if (updates.ageThreshold !== undefined) {
           dbUpdates.ageThreshold = updates.ageThreshold
+        }
+        if (updates.maxReplyDepth !== undefined) {
+          dbUpdates.maxReplyDepth = updates.maxReplyDepth
         }
         if (updates.requireLoginForMature !== undefined) {
           dbUpdates.requireLoginForMature = updates.requireLoginForMature
