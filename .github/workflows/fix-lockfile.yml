@@ -1,0 +1,50 @@
+name: Fix Lockfile
+
+# Dependabot doesn't handle pnpm catalogs correctly -- it resolves
+# catalog: specifiers to concrete versions in the lockfile, causing
+# a mismatch that fails `pnpm install --frozen-lockfile` in CI.
+# This workflow regenerates the lockfile on Dependabot PRs.
+
+on:
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix-lockfile:
+    name: Regenerate lockfile
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+
+      - name: Regenerate lockfile
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Commit updated lockfile
+        run: |
+          if git diff --quiet pnpm-lock.yaml; then
+            echo "Lockfile is already in sync."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pnpm-lock.yaml
+          git commit -m "fix(deps): regenerate lockfile for pnpm catalog compatibility"
+          git push
