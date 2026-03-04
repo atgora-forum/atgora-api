@@ -88,8 +88,9 @@ export function createChainableProxy(terminalResult: unknown = []): DbChain {
   // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Intentionally thenable mock for Drizzle chain
   chain.where.mockImplementation(() => makeThenable())
 
-  // groupBy chains to having; having is terminal (thenable)
-  chain.groupBy.mockImplementation(() => chain)
+  // groupBy is thenable (for standalone use) and also chains to having
+  // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Intentionally thenable mock for Drizzle chain
+  chain.groupBy.mockImplementation(() => makeThenable())
   // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Intentionally thenable mock for Drizzle chain
   chain.having.mockImplementation(() => makeThenable())
 

@@ -1,6 +1,6 @@
 {
-  "id": "fb61c80e-ea91-48e9-8d9c-7beaf93d08f1",
-  "prevId": "5f8531c6-1108-4540-8776-0cb9de6ab736",
+  "id": "9015e774-1584-45d9-a654-9cf4437fa526",
+  "prevId": "fb61c80e-ea91-48e9-8d9c-7beaf93d08f1",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -616,6 +616,13 @@
           "notNull": true,
           "default": 0
         },
+        "depth": {
+          "name": "depth",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -775,6 +782,27 @@
             },
             {
               "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "replies_root_uri_depth_idx": {
+          "name": "replies_root_uri_depth_idx",
+          "columns": [
+            {
+              "expression": "root_uri",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "depth",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1187,6 +1215,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": 16
+        },
+        "max_reply_depth": {
+          "name": "max_reply_depth",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 9999
         },
         "require_login_for_mature": {
           "name": "require_login_for_mature",

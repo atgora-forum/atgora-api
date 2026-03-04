@@ -27,7 +27,12 @@ function createMockDb() {
   })
   const onConflictDoNothingFn = vi.fn<() => Promise<unknown[]>>().mockResolvedValue([])
   const valuesFn = vi
-    .fn<() => { onConflictDoUpdate: typeof onConflictDoUpdateFn; onConflictDoNothing: typeof onConflictDoNothingFn }>()
+    .fn<
+      () => {
+        onConflictDoUpdate: typeof onConflictDoUpdateFn
+        onConflictDoNothing: typeof onConflictDoNothingFn
+      }
+    >()
     .mockReturnValue({
       onConflictDoUpdate: onConflictDoUpdateFn,
       onConflictDoNothing: onConflictDoNothingFn,
@@ -274,9 +279,7 @@ describe('SetupService', () => {
     })
 
     it('promotes initializing user to admin role in users table', async () => {
-      mocks.returningFn.mockResolvedValueOnce([
-        { communityName: 'Test Forum', communityDid: null },
-      ])
+      mocks.returningFn.mockResolvedValueOnce([{ communityName: 'Test Forum', communityDid: null }])
 
       const result = await service.initialize({
         did: TEST_DID,
@@ -496,10 +499,17 @@ describe('SetupService', () => {
       // Capture the values passed to the third insert call (pages)
       let capturedPageValues: Array<{ slug: string; status: string; communityDid: string }> = []
       mocks.valuesFn.mockImplementation((vals: unknown) => {
-        if (Array.isArray(vals) && vals.length > 0 && 'slug' in (vals[0] as Record<string, unknown>)) {
+        if (
+          Array.isArray(vals) &&
+          vals.length > 0 &&
+          'slug' in (vals[0] as Record<string, unknown>)
+        ) {
           capturedPageValues = vals as typeof capturedPageValues
         }
-        return { onConflictDoUpdate: mocks.onConflictDoUpdateFn, onConflictDoNothing: mocks.onConflictDoNothingFn }
+        return {
+          onConflictDoUpdate: mocks.onConflictDoUpdateFn,
+          onConflictDoNothing: mocks.onConflictDoNothingFn,
+        }
       })
 
       await service.initialize({

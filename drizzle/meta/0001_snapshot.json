@@ -518,9 +518,7 @@
           "name": "tenant_isolation",
           "as": "PERMISSIVE",
           "for": "ALL",
-          "to": [
-            "barazo_app"
-          ],
+          "to": ["barazo_app"],
           "using": "community_did = current_setting('app.current_community_did', true)",
           "withCheck": "community_did = current_setting('app.current_community_did', true)"
         }
@@ -796,9 +794,7 @@
           "name": "tenant_isolation",
           "as": "PERMISSIVE",
           "for": "ALL",
-          "to": [
-            "barazo_app"
-          ],
+          "to": ["barazo_app"],
           "using": "community_did = current_setting('app.current_community_did', true)",
           "withCheck": "community_did = current_setting('app.current_community_did', true)"
         }
@@ -946,11 +942,7 @@
         "reactions_author_subject_type_uniq": {
           "name": "reactions_author_subject_type_uniq",
           "nullsNotDistinct": false,
-          "columns": [
-            "author_did",
-            "subject_uri",
-            "type"
-          ]
+          "columns": ["author_did", "subject_uri", "type"]
         }
       },
       "policies": {
@@ -958,9 +950,7 @@
           "name": "tenant_isolation",
           "as": "PERMISSIVE",
           "for": "ALL",
-          "to": [
-            "barazo_app"
-          ],
+          "to": ["barazo_app"],
           "using": "community_did = current_setting('app.current_community_did', true)",
           "withCheck": "community_did = current_setting('app.current_community_did', true)"
         }
@@ -1087,10 +1077,7 @@
         "votes_author_subject_uniq": {
           "name": "votes_author_subject_uniq",
           "nullsNotDistinct": false,
-          "columns": [
-            "author_did",
-            "subject_uri"
-          ]
+          "columns": ["author_did", "subject_uri"]
         }
       },
       "policies": {},
@@ -1286,9 +1273,7 @@
           "name": "tenant_isolation",
           "as": "PERMISSIVE",
           "for": "ALL",
-          "to": [
-            "barazo_app"
-          ],
+          "to": ["barazo_app"],
           "using": "community_did = current_setting('app.current_community_did', true)",
           "withCheck": "community_did = current_setting('app.current_community_did', true)"
         }
@@ -1438,12 +1423,8 @@
           "name": "categories_parent_id_fk",
           "tableFrom": "categories",
           "tableTo": "categories",
-          "columnsFrom": [
-            "parent_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["parent_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1455,9 +1436,7 @@
           "name": "tenant_isolation",
           "as": "PERMISSIVE",
           "for": "ALL",
-          "to": [
-            "barazo_app"
-          ],
+          "to": ["barazo_app"],
           "using": "community_did = current_setting('app.current_community_did', true)",
           "withCheck": "community_did = current_setting('app.current_community_did', true)"
         }
@@ -1604,9 +1583,7 @@
           "name": "tenant_isolation",
           "as": "PERMISSIVE",
           "for": "ALL",
-          "to": [
-            "barazo_app"
-          ],
+          "to": ["barazo_app"],
           "using": "community_did = current_setting('app.current_community_did', true)",
           "withCheck": "community_did = current_setting('app.current_community_did', true)"
         }
@@ -1839,9 +1816,7 @@
           "name": "tenant_isolation",
           "as": "PERMISSIVE",
           "for": "ALL",
-          "to": [
-            "barazo_app"
-          ],
+          "to": ["barazo_app"],
           "using": "community_did = current_setting('app.current_community_did', true)",
           "withCheck": "community_did = current_setting('app.current_community_did', true)"
         }
@@ -1965,9 +1940,7 @@
           "name": "tenant_isolation",
           "as": "PERMISSIVE",
           "for": "ALL",
-          "to": [
-            "barazo_app"
-          ],
+          "to": ["barazo_app"],
           "using": "community_did = current_setting('app.current_community_did', true)",
           "withCheck": "community_did = current_setting('app.current_community_did', true)"
         }
@@ -2065,10 +2038,7 @@
       "compositePrimaryKeys": {
         "user_community_preferences_did_community_did_pk": {
           "name": "user_community_preferences_did_community_did_pk",
-          "columns": [
-            "did",
-            "community_did"
-          ]
+          "columns": ["did", "community_did"]
         }
       },
       "uniqueConstraints": {},
@@ -2077,9 +2047,7 @@
           "name": "tenant_isolation",
           "as": "PERMISSIVE",
           "for": "ALL",
-          "to": [
-            "barazo_app"
-          ],
+          "to": ["barazo_app"],
           "using": "community_did = current_setting('app.current_community_did', true)",
           "withCheck": "community_did = current_setting('app.current_community_did', true)"
         }
@@ -2349,9 +2317,7 @@
           "name": "tenant_isolation",
           "as": "PERMISSIVE",
           "for": "ALL",
-          "to": [
-            "barazo_app"
-          ],
+          "to": ["barazo_app"],
           "using": "community_did = current_setting('app.current_community_did', true)",
           "withCheck": "community_did = current_setting('app.current_community_did', true)"
         }
@@ -2422,11 +2388,7 @@
       "compositePrimaryKeys": {
         "user_onboarding_responses_did_community_did_field_id_pk": {
           "name": "user_onboarding_responses_did_community_did_field_id_pk",
-          "columns": [
-            "did",
-            "community_did",
-            "field_id"
-          ]
+          "columns": ["did", "community_did", "field_id"]
         }
       },
       "uniqueConstraints": {},
@@ -2435,9 +2397,7 @@
           "name": "tenant_isolation",
           "as": "PERMISSIVE",
           "for": "ALL",
-          "to": [
-            "barazo_app"
-          ],
+          "to": ["barazo_app"],
           "using": "community_did = current_setting('app.current_community_did', true)",
           "withCheck": "community_did = current_setting('app.current_community_did', true)"
         }
@@ -2603,9 +2563,7 @@
           "name": "tenant_isolation",
           "as": "PERMISSIVE",
           "for": "ALL",
-          "to": [
-            "barazo_app"
-          ],
+          "to": ["barazo_app"],
           "using": "community_did = current_setting('app.current_community_did', true)",
           "withCheck": "community_did = current_setting('app.current_community_did', true)"
         }
@@ -2702,9 +2660,7 @@
           "name": "tenant_isolation",
           "as": "PERMISSIVE",
           "for": "ALL",
-          "to": [
-            "barazo_app"
-          ],
+          "to": ["barazo_app"],
           "using": "community_did = current_setting('app.current_community_did', true)",
           "withCheck": "community_did = current_setting('app.current_community_did', true)"
         }
@@ -2830,9 +2786,7 @@
           "name": "tenant_isolation",
           "as": "PERMISSIVE",
           "for": "ALL",
-          "to": [
-            "barazo_app"
-          ],
+          "to": ["barazo_app"],
           "using": "community_did = current_setting('app.current_community_did', true)",
           "withCheck": "community_did = current_setting('app.current_community_did', true)"
         }
@@ -3007,9 +2961,7 @@
           "name": "tenant_isolation",
           "as": "PERMISSIVE",
           "for": "ALL",
-          "to": [
-            "barazo_app"
-          ],
+          "to": ["barazo_app"],
           "using": "community_did = current_setting('app.current_community_did', true)",
           "withCheck": "community_did = current_setting('app.current_community_did', true)"
         }
@@ -3237,10 +3189,7 @@
       "compositePrimaryKeys": {
         "community_profiles_did_community_did_pk": {
           "name": "community_profiles_did_community_did_pk",
-          "columns": [
-            "did",
-            "community_did"
-          ]
+          "columns": ["did", "community_did"]
         }
       },
       "uniqueConstraints": {},
@@ -3249,9 +3198,7 @@
           "name": "tenant_isolation",
           "as": "PERMISSIVE",
           "for": "ALL",
-          "to": [
-            "barazo_app"
-          ],
+          "to": ["barazo_app"],
           "using": "community_did = current_setting('app.current_community_did', true)",
           "withCheck": "community_did = current_setting('app.current_community_did', true)"
         }
@@ -3342,12 +3289,7 @@
       "compositePrimaryKeys": {
         "interaction_graph_source_did_target_did_community_id_interaction_type_pk": {
           "name": "interaction_graph_source_did_target_did_community_id_interaction_type_pk",
-          "columns": [
-            "source_did",
-            "target_did",
-            "community_id",
-            "interaction_type"
-          ]
+          "columns": ["source_did", "target_did", "community_id", "interaction_type"]
         }
       },
       "uniqueConstraints": {},
@@ -3486,10 +3428,7 @@
       "compositePrimaryKeys": {
         "trust_scores_did_community_id_pk": {
           "name": "trust_scores_did_community_id_pk",
-          "columns": [
-            "did",
-            "community_id"
-          ]
+          "columns": ["did", "community_id"]
         }
       },
       "uniqueConstraints": {},
@@ -3625,12 +3564,8 @@
           "name": "sybil_cluster_members_cluster_id_sybil_clusters_id_fk",
           "tableFrom": "sybil_cluster_members",
           "tableTo": "sybil_clusters",
-          "columnsFrom": [
-            "cluster_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["cluster_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -3638,10 +3573,7 @@
       "compositePrimaryKeys": {
         "sybil_cluster_members_cluster_id_did_pk": {
           "name": "sybil_cluster_members_cluster_id_did_pk",
-          "columns": [
-            "cluster_id",
-            "did"
-          ]
+          "columns": ["cluster_id", "did"]
         }
       },
       "uniqueConstraints": {},

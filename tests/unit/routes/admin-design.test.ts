@@ -34,7 +34,13 @@ vi.mock('sharp', () => {
 import { adminDesignRoutes } from '../../../src/routes/admin-design.js'
 
 // Retrieve the mock instance exported from the vi.mock factory
-const { __mockInstance: mockSharpInstance } = await vi.importMock<{ __mockInstance: { resize: ReturnType<typeof vi.fn>; webp: ReturnType<typeof vi.fn>; toBuffer: ReturnType<typeof vi.fn> } }>('sharp')
+const { __mockInstance: mockSharpInstance } = await vi.importMock<{
+  __mockInstance: {
+    resize: ReturnType<typeof vi.fn>
+    webp: ReturnType<typeof vi.fn>
+    toBuffer: ReturnType<typeof vi.fn>
+  }
+}>('sharp')
 
 // ---------------------------------------------------------------------------
 // Mock env
@@ -102,7 +108,11 @@ function createMockStorage(): StorageService {
 // ---------------------------------------------------------------------------
 
 function createMockRequireAdmin(user?: RequestUser) {
-  return (request: { user?: RequestUser }, reply: { status: (code: number) => { send: (body: unknown) => void } }, done: () => void) => {
+  return (
+    request: { user?: RequestUser },
+    reply: { status: (code: number) => { send: (body: unknown) => void } },
+    done: () => void
+  ) => {
     if (!user) {
       reply.status(401).send({ error: 'Authentication required' })
       return
@@ -262,11 +272,7 @@ describe('admin design routes', () => {
       })
 
       // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(mockStorage.store).toHaveBeenCalledWith(
-        expect.any(Buffer),
-        'image/webp',
-        'logos'
-      )
+      expect(mockStorage.store).toHaveBeenCalledWith(expect.any(Buffer), 'image/webp', 'logos')
     })
 
     it('returns 401 when not authenticated', async () => {
@@ -423,11 +429,7 @@ describe('admin design routes', () => {
       })
 
       // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(mockStorage.store).toHaveBeenCalledWith(
-        expect.any(Buffer),
-        'image/webp',
-        'favicons'
-      )
+      expect(mockStorage.store).toHaveBeenCalledWith(expect.any(Buffer), 'image/webp', 'favicons')
     })
 
     it('returns 401 when not authenticated', async () => {

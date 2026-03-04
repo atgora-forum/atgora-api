@@ -1,4 +1,13 @@
-import { pgTable, pgPolicy, text, integer, timestamp, jsonb, boolean, index } from 'drizzle-orm/pg-core'
+import {
+  pgTable,
+  pgPolicy,
+  text,
+  integer,
+  timestamp,
+  jsonb,
+  boolean,
+  index,
+} from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import { appRole } from './roles.js'
 
@@ -19,6 +28,7 @@ export const replies = pgTable(
     labels: jsonb('labels').$type<{ values: { val: string }[] }>(),
     reactionCount: integer('reaction_count').notNull().default(0),
     voteCount: integer('vote_count').notNull().default(0),
+    depth: integer('depth').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
     indexedAt: timestamp('indexed_at', { withTimezone: true }).notNull().defaultNow(),
     isAuthorDeleted: boolean('is_author_deleted').notNull().default(false),
@@ -48,6 +58,7 @@ export const replies = pgTable(
     index('replies_moderation_status_idx').on(table.moderationStatus),
     index('replies_trust_status_idx').on(table.trustStatus),
     index('replies_root_uri_created_at_idx').on(table.rootUri, table.createdAt),
+    index('replies_root_uri_depth_idx').on(table.rootUri, table.depth),
     pgPolicy('tenant_isolation', {
       as: 'permissive',
       to: appRole,

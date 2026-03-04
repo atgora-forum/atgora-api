@@ -35,7 +35,9 @@ export const communityOnboardingFields = pgTable(
     sortOrder: integer('sort_order').notNull().default(0),
     source: text('source', {
       enum: ['platform', 'admin'],
-    }).notNull().default('admin'),
+    })
+      .notNull()
+      .default('admin'),
     config: jsonb('config').$type<Record<string, unknown>>(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

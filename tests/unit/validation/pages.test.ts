@@ -70,9 +70,7 @@ describe('createPageSchema', () => {
   })
 
   it('accepts title at 200 chars', () => {
-    expect(createPageSchema.safeParse({ ...validInput, title: 'x'.repeat(200) }).success).toBe(
-      true
-    )
+    expect(createPageSchema.safeParse({ ...validInput, title: 'x'.repeat(200) }).success).toBe(true)
   })
 
   // Slug validation
@@ -81,9 +79,7 @@ describe('createPageSchema', () => {
   })
 
   it('rejects slug over 100 chars', () => {
-    expect(createPageSchema.safeParse({ ...validInput, slug: 'a'.repeat(101) }).success).toBe(
-      false
-    )
+    expect(createPageSchema.safeParse({ ...validInput, slug: 'a'.repeat(101) }).success).toBe(false)
   })
 
   it('rejects slug with uppercase', () => {
@@ -107,9 +103,9 @@ describe('createPageSchema', () => {
   })
 
   it('accepts valid slug with hyphens', () => {
-    expect(
-      createPageSchema.safeParse({ ...validInput, slug: 'terms-of-service' }).success
-    ).toBe(true)
+    expect(createPageSchema.safeParse({ ...validInput, slug: 'terms-of-service' }).success).toBe(
+      true
+    )
   })
 
   // Reserved slugs
@@ -161,9 +157,7 @@ describe('createPageSchema', () => {
 
   // metaDescription validation
   it('accepts null metaDescription', () => {
-    expect(
-      createPageSchema.safeParse({ ...validInput, metaDescription: null }).success
-    ).toBe(true)
+    expect(createPageSchema.safeParse({ ...validInput, metaDescription: null }).success).toBe(true)
   })
 
   it('rejects metaDescription over 320 chars', () => {
@@ -180,9 +174,7 @@ describe('createPageSchema', () => {
 
   // parentId
   it('accepts parentId as a string', () => {
-    expect(
-      createPageSchema.safeParse({ ...validInput, parentId: 'page-123' }).success
-    ).toBe(true)
+    expect(createPageSchema.safeParse({ ...validInput, parentId: 'page-123' }).success).toBe(true)
   })
 
   it('accepts null parentId', () => {

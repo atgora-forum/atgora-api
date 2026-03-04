@@ -50,6 +50,12 @@ export const updateSettingsSchema = z.object({
     .max(18, 'Age threshold must be at most 18')
     .optional(),
   requireLoginForMature: z.boolean().optional(),
+  maxReplyDepth: z
+    .number()
+    .int('Max reply depth must be an integer')
+    .min(1, 'Max reply depth must be at least 1')
+    .max(9999, 'Max reply depth must be at most 9999')
+    .optional(),
 })
 
 export type UpdateSettingsInput = z.infer<typeof updateSettingsSchema>
@@ -74,6 +80,7 @@ export const settingsResponseSchema = z.object({
   accentColor: z.string().nullable(),
   jurisdictionCountry: z.string().nullable(),
   ageThreshold: z.number(),
+  maxReplyDepth: z.number(),
   requireLoginForMature: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),

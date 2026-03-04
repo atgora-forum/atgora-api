@@ -298,10 +298,7 @@ export function pageRoutes(): FastifyPluginCallback {
       async (request, reply) => {
         const communityDid = requireCommunityDid(request)
 
-        const rows = await db
-          .select()
-          .from(pages)
-          .where(eq(pages.communityDid, communityDid))
+        const rows = await db.select().from(pages).where(eq(pages.communityDid, communityDid))
 
         const tree = buildPageTree(rows)
 
@@ -530,10 +527,7 @@ export function pageRoutes(): FastifyPluginCallback {
           }
 
           // Fetch all pages to check for cycles
-          const allPages = await db
-            .select()
-            .from(pages)
-            .where(eq(pages.communityDid, communityDid))
+          const allPages = await db.select().from(pages).where(eq(pages.communityDid, communityDid))
 
           if (wouldCreateCycle(id, updates.parentId, allPages)) {
             throw badRequest('Setting this parent would create a circular reference')
@@ -553,11 +547,7 @@ export function pageRoutes(): FastifyPluginCallback {
         if (updates.parentId !== undefined) dbUpdates.parentId = updates.parentId ?? null
         if (updates.sortOrder !== undefined) dbUpdates.sortOrder = updates.sortOrder
 
-        const updated = await db
-          .update(pages)
-          .set(dbUpdates)
-          .where(eq(pages.id, id))
-          .returning()
+        const updated = await db.update(pages).set(dbUpdates).where(eq(pages.id, id)).returning()
 
         const updatedRow = updated[0]
         if (!updatedRow) {

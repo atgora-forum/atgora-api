@@ -74,7 +74,7 @@ function resetAllDbMocks(): void {
   mockDb.select.mockReturnValue(selectChain)
   mockDb.update.mockReturnValue(updateChain)
   mockDb.delete.mockReturnValue(deleteChain)
-  // eslint-disable-next-line @typescript-eslint/no-misused-promises -- Intentionally async mock for Drizzle transaction
+   
   mockDb.transaction.mockImplementation(async (fn: (tx: typeof mockDb) => Promise<void>) => {
     await fn(mockDb)
   })
@@ -205,10 +205,9 @@ describe('page routes', () => {
       const longContent = 'A'.repeat(300)
       selectChain.where.mockImplementation(() => ({
         ...selectChain,
-        then: (resolve: (v: unknown) => void) =>
-          { resolve([
-            samplePageRow({ content: longContent }),
-          ]); },
+        then: (resolve: (v: unknown) => void) => {
+          resolve([samplePageRow({ content: longContent })])
+        },
       }))
 
       const response = await app.inject({
@@ -259,8 +258,9 @@ describe('page routes', () => {
     it('returns a published page with full content', async () => {
       selectChain.where.mockImplementation(() => ({
         ...selectChain,
-        then: (resolve: (v: unknown) => void) =>
-          { resolve([samplePageRow()]); },
+        then: (resolve: (v: unknown) => void) => {
+          resolve([samplePageRow()])
+        },
       }))
 
       const response = await app.inject({
@@ -278,7 +278,9 @@ describe('page routes', () => {
       // With status filter in the WHERE clause, a draft page is not returned by the DB
       selectChain.where.mockImplementation(() => ({
         ...selectChain,
-        then: (resolve: (v: unknown) => void) => { resolve([]); },
+        then: (resolve: (v: unknown) => void) => {
+          resolve([])
+        },
       }))
 
       const response = await app.inject({
@@ -322,11 +324,12 @@ describe('page routes', () => {
     it('returns all pages including drafts', async () => {
       selectChain.where.mockImplementation(() => ({
         ...selectChain,
-        then: (resolve: (v: unknown) => void) =>
-          { resolve([
+        then: (resolve: (v: unknown) => void) => {
+          resolve([
             samplePageRow(),
             samplePageRow({ id: PAGE_ID_2, slug: 'draft-page', status: 'draft', sortOrder: 1 }),
-          ]); },
+          ])
+        },
       }))
 
       const response = await app.inject({
@@ -383,8 +386,9 @@ describe('page routes', () => {
     it('returns a page by ID with full content', async () => {
       selectChain.where.mockImplementation(() => ({
         ...selectChain,
-        then: (resolve: (v: unknown) => void) =>
-          { resolve([samplePageRow()]); },
+        then: (resolve: (v: unknown) => void) => {
+          resolve([samplePageRow()])
+        },
       }))
 
       const response = await app.inject({
@@ -433,13 +437,17 @@ describe('page routes', () => {
       // Slug uniqueness check returns empty (no conflict)
       selectChain.where.mockImplementationOnce(() => ({
         ...selectChain,
-        then: (resolve: (v: unknown) => void) => { resolve([]); },
+        then: (resolve: (v: unknown) => void) => {
+          resolve([])
+        },
       }))
 
       // Insert returning
       insertChain.returning.mockImplementationOnce(() => ({
         ...insertChain,
-        then: (resolve: (v: unknown) => void) => { resolve([created]); },
+        then: (resolve: (v: unknown) => void) => {
+          resolve([created])
+        },
       }))
 
       const response = await app.inject({
@@ -488,7 +496,9 @@ describe('page routes', () => {
       // Slug uniqueness check returns existing page
       selectChain.where.mockImplementationOnce(() => ({
         ...selectChain,
-        then: (resolve: (v: unknown) => void) => { resolve([samplePageRow()]); },
+        then: (resolve: (v: unknown) => void) => {
+          resolve([samplePageRow()])
+        },
       }))
 
       const response = await app.inject({
@@ -507,12 +517,16 @@ describe('page routes', () => {
       // Slug uniqueness check returns empty
       selectChain.where.mockImplementationOnce(() => ({
         ...selectChain,
-        then: (resolve: (v: unknown) => void) => { resolve([]); },
+        then: (resolve: (v: unknown) => void) => {
+          resolve([])
+        },
       }))
       // Parent check returns empty
       selectChain.where.mockImplementationOnce(() => ({
         ...selectChain,
-        then: (resolve: (v: unknown) => void) => { resolve([]); },
+        then: (resolve: (v: unknown) => void) => {
+          resolve([])
+        },
       }))
 
       const response = await app.inject({
@@ -567,13 +581,17 @@ describe('page routes', () => {
       // Find existing
       selectChain.where.mockImplementationOnce(() => ({
         ...selectChain,
-        then: (resolve: (v: unknown) => void) => { resolve([existing]); },
+        then: (resolve: (v: unknown) => void) => {
+          resolve([existing])
+        },
       }))
 
       // Update returning
       updateChain.returning.mockImplementationOnce(() => ({
         ...updateChain,
-        then: (resolve: (v: unknown) => void) => { resolve([updated]); },
+        then: (resolve: (v: unknown) => void) => {
+          resolve([updated])
+        },
       }))
 
       const response = await app.inject({
@@ -603,14 +621,17 @@ describe('page routes', () => {
       // Find existing
       selectChain.where.mockImplementationOnce(() => ({
         ...selectChain,
-        then: (resolve: (v: unknown) => void) => { resolve([existing]); },
+        then: (resolve: (v: unknown) => void) => {
+          resolve([existing])
+        },
       }))
 
       // Slug uniqueness check returns existing page with different ID
       selectChain.where.mockImplementationOnce(() => ({
         ...selectChain,
-        then: (resolve: (v: unknown) => void) =>
-          { resolve([samplePageRow({ id: PAGE_ID_2, slug: 'other-slug' })]); },
+        then: (resolve: (v: unknown) => void) => {
+          resolve([samplePageRow({ id: PAGE_ID_2, slug: 'other-slug' })])
+        },
       }))
 
       const response = await app.inject({
@@ -629,19 +650,25 @@ describe('page routes', () => {
       // Find existing (the parent page)
       selectChain.where.mockImplementationOnce(() => ({
         ...selectChain,
-        then: (resolve: (v: unknown) => void) => { resolve([parent]); },
+        then: (resolve: (v: unknown) => void) => {
+          resolve([parent])
+        },
       }))
 
       // Parent exists check
       selectChain.where.mockImplementationOnce(() => ({
         ...selectChain,
-        then: (resolve: (v: unknown) => void) => { resolve([child]); },
+        then: (resolve: (v: unknown) => void) => {
+          resolve([child])
+        },
       }))
 
       // Fetch all pages for cycle detection
       selectChain.where.mockImplementationOnce(() => ({
         ...selectChain,
-        then: (resolve: (v: unknown) => void) => { resolve([parent, child]); },
+        then: (resolve: (v: unknown) => void) => {
+          resolve([parent, child])
+        },
       }))
 
       const response = await app.inject({
@@ -659,13 +686,17 @@ describe('page routes', () => {
       // Find existing
       selectChain.where.mockImplementationOnce(() => ({
         ...selectChain,
-        then: (resolve: (v: unknown) => void) => { resolve([existing]); },
+        then: (resolve: (v: unknown) => void) => {
+          resolve([existing])
+        },
       }))
 
       // Parent exists check (returns existing which is the same page)
       selectChain.where.mockImplementationOnce(() => ({
         ...selectChain,
-        then: (resolve: (v: unknown) => void) => { resolve([existing]); },
+        then: (resolve: (v: unknown) => void) => {
+          resolve([existing])
+        },
       }))
 
       const response = await app.inject({
@@ -702,12 +733,16 @@ describe('page routes', () => {
       // Find existing
       selectChain.where.mockImplementationOnce(() => ({
         ...selectChain,
-        then: (resolve: (v: unknown) => void) => { resolve([samplePageRow()]); },
+        then: (resolve: (v: unknown) => void) => {
+          resolve([samplePageRow()])
+        },
       }))
       // Check children returns empty
       selectChain.where.mockImplementationOnce(() => ({
         ...selectChain,
-        then: (resolve: (v: unknown) => void) => { resolve([]); },
+        then: (resolve: (v: unknown) => void) => {
+          resolve([])
+        },
       }))
 
       const response = await app.inject({
@@ -731,13 +766,16 @@ describe('page routes', () => {
       // Find existing
       selectChain.where.mockImplementationOnce(() => ({
         ...selectChain,
-        then: (resolve: (v: unknown) => void) => { resolve([samplePageRow()]); },
+        then: (resolve: (v: unknown) => void) => {
+          resolve([samplePageRow()])
+        },
       }))
       // Check children returns a child
       selectChain.where.mockImplementationOnce(() => ({
         ...selectChain,
-        then: (resolve: (v: unknown) => void) =>
-          { resolve([samplePageRow({ id: PAGE_ID_2, parentId: PAGE_ID_1 })]); },
+        then: (resolve: (v: unknown) => void) => {
+          resolve([samplePageRow({ id: PAGE_ID_2, parentId: PAGE_ID_1 })])
+        },
       }))
 
       const response = await app.inject({

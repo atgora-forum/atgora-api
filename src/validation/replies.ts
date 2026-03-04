@@ -52,6 +52,12 @@ export const replyQuerySchema = z.object({
     .pipe(z.number().int().min(1).max(100))
     .optional()
     .default(25),
+  depth: z
+    .string()
+    .transform((val) => Number(val))
+    .pipe(z.number().int().min(1).max(100))
+    .optional()
+    .default(10),
 })
 
 export type ReplyQueryInput = z.infer<typeof replyQuerySchema>

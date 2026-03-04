@@ -249,6 +249,7 @@ function sampleReplyRow(overrides?: Record<string, unknown>) {
     cid: TEST_REPLY_CID,
     labels: null,
     reactionCount: 0,
+    depth: 1,
     createdAt: new Date(TEST_NOW),
     indexedAt: new Date(TEST_NOW),
     isAuthorDeleted: false,
@@ -720,17 +721,19 @@ describe('reply routes', () => {
     it('includes depth field in reply responses', async () => {
       selectChain.where.mockResolvedValueOnce([sampleTopicRow()])
 
-      // A direct reply (parentUri === rootUri) should have depth 0
+      // A direct reply to topic has depth 1 (stored in DB)
       const directReply = sampleReplyRow({
         parentUri: TEST_TOPIC_URI,
         parentCid: TEST_TOPIC_CID,
+        depth: 1,
       })
-      // A nested reply (parentUri !== rootUri) should have depth 1
+      // A nested reply has depth 2 (stored in DB)
       const nestedReply = sampleReplyRow({
         uri: `at://${TEST_DID}/forum.barazo.topic.reply/nested001`,
         rkey: 'nested001',
         parentUri: TEST_REPLY_URI,
         parentCid: TEST_REPLY_CID,
+        depth: 2,
       })
       selectChain.limit.mockResolvedValueOnce([directReply, nestedReply])
 
@@ -743,8 +746,8 @@ describe('reply routes', () => {
       expect(response.statusCode).toBe(200)
       const body = response.json<{ replies: Array<{ depth: number; parentUri: string }> }>()
       expect(body.replies).toHaveLength(2)
-      expect(body.replies[0]?.depth).toBe(0)
-      expect(body.replies[1]?.depth).toBe(1)
+      expect(body.replies[0]?.depth).toBe(1)
+      expect(body.replies[1]?.depth).toBe(2)
     })
 
     it('returns placeholder content for mod-deleted replies', async () => {
@@ -1005,6 +1008,8 @@ describe('reply routes', () => {
         }),
       ]
       selectChain.limit.mockResolvedValueOnce(rows)
+
+      selectChain.where.mockImplementationOnce(() => selectChain) // 6.5: child count query
 
       selectChain.where.mockResolvedValueOnce([
         // 7: resolveAuthors users
@@ -2019,6 +2024,8 @@ describe('reply routes', () => {
         sampleReplyRow({ authorDid: TEST_DID }),
       ]
       selectChain.limit.mockResolvedValueOnce(rows)
+
+      selectChain.where.mockImplementationOnce(() => selectChain) // child count query
 
       // Ozone batch: spamDid is spam-labeled, TEST_DID is not
       mockOzoneService.batchIsSpamLabeled.mockResolvedValueOnce(

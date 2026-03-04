@@ -71,10 +71,7 @@ export const updatePageSchema = z.object({
     .max(200, 'Title must be at most 200 characters')
     .optional(),
   slug: slugField.optional(),
-  content: z
-    .string()
-    .max(100_000, 'Content must be at most 100000 characters')
-    .optional(),
+  content: z.string().max(100_000, 'Content must be at most 100000 characters').optional(),
   status: pageStatusSchema.optional(),
   metaDescription: z
     .string()

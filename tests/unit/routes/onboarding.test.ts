@@ -153,7 +153,10 @@ function sampleResponse(overrides?: Record<string, unknown>) {
 // Helper: build test app
 // ---------------------------------------------------------------------------
 
-async function buildTestApp(user?: RequestUser, envOverrides?: Partial<Env>): Promise<FastifyInstance> {
+async function buildTestApp(
+  user?: RequestUser,
+  envOverrides?: Partial<Env>
+): Promise<FastifyInstance> {
   const app = Fastify({ logger: false })
 
   const authMiddleware = createMockAuthMiddleware(user)
@@ -241,7 +244,10 @@ describe('onboarding admin routes', () => {
       })
 
       expect(response.statusCode).toBe(200)
-      const body = response.json<{ fields: { id: string; source: string }[]; hostingMode: string }>()
+      const body = response.json<{
+        fields: { id: string; source: string }[]
+        hostingMode: string
+      }>()
       expect(body.fields).toHaveLength(2)
       expect(body.fields[0]?.id).toBe('field-001')
       expect(body.fields[0]?.source).toBe('admin')

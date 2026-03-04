@@ -24,6 +24,7 @@ describe('communitySettings schema', () => {
       'communityName',
       'maturityRating',
       'reactionSet',
+      'maxReplyDepth',
       'handle',
       'serviceEndpoint',
       'signingKey',
@@ -100,5 +101,10 @@ describe('communitySettings schema', () => {
 
   it('has default value for reactionSet', () => {
     expect(columns.reactionSet.hasDefault).toBe(true)
+  })
+
+  it('has maxReplyDepth column with notNull and default value', () => {
+    expect(columns.maxReplyDepth.notNull).toBe(true)
+    expect(columns.maxReplyDepth.hasDefault).toBe(true)
   })
 })

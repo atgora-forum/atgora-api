@@ -79,6 +79,7 @@ const replyJsonSchema = {
     communityDid: { type: 'string' as const },
     cid: { type: 'string' as const },
     depth: { type: 'integer' as const },
+    childCount: { type: 'integer' as const },
     reactionCount: { type: 'integer' as const },
     isAuthorDeleted: { type: 'boolean' as const },
     isModDeleted: { type: 'boolean' as const },
@@ -99,10 +100,7 @@ const replyJsonSchema = {
  * Converts Date fields to ISO strings and computes depth.
  */
 function serializeReply(row: typeof replies.$inferSelect) {
-  // Simple depth calculation for MVP:
-  // depth 0 = direct reply to topic (parentUri === rootUri)
-  // depth 1 = reply to a reply (parentUri !== rootUri)
-  const depth = row.parentUri === row.rootUri ? 0 : 1
+  const depth = row.depth
 
   const isDeleted = row.isAuthorDeleted || row.isModDeleted
   const placeholderContent = row.isModDeleted
@@ -317,6 +315,7 @@ export function replyRoutes(): FastifyPluginCallback {
         let parentRefUri = topic.uri
         let parentRefCid = topic.cid
 
+        let depth = 1
         if (parentUri) {
           // Look up the parent reply
           const parentReplyRows = await db.select().from(replies).where(eq(replies.uri, parentUri))
@@ -327,6 +326,7 @@ export function replyRoutes(): FastifyPluginCallback {
           }
           parentRefUri = parentReply.uri
           parentRefCid = parentReply.cid
+          depth = parentReply.depth + 1
         }
 
         const now = new Date().toISOString()
@@ -378,6 +378,7 @@ export function replyRoutes(): FastifyPluginCallback {
               cid: pdsResult.cid,
               labels: labels ?? null,
               reactionCount: 0,
+              depth,
               moderationStatus: contentModerationStatus,
               createdAt: new Date(now),
               indexedAt: new Date(),
@@ -512,6 +513,7 @@ export function replyRoutes(): FastifyPluginCallback {
             properties: {
               cursor: { type: 'string' },
               limit: { type: 'string' },
+              depth: { type: 'string' },
             },
           },
           response: {
@@ -588,10 +590,11 @@ export function replyRoutes(): FastifyPluginCallback {
         // Block/mute filtering: load the authenticated user's preferences
         const { blockedDids, mutedDids } = await loadBlockMuteLists(request.user?.did, db)
 
-        const { cursor, limit } = parsedQuery.data
+        const { cursor, limit, depth: maxDepth } = parsedQuery.data
         const conditions = [
           eq(replies.rootUri, decodedTopicUri),
           eq(replies.moderationStatus, 'approved'),
+          sql`${replies.depth} <= ${maxDepth}`,
         ]
 
         // Exclude replies by blocked authors
@@ -624,6 +627,24 @@ export function replyRoutes(): FastifyPluginCallback {
         const resultRows = hasMore ? rows.slice(0, limit) : rows
         const serialized = resultRows.map(serializeReply)
 
+        // Query child counts for replies at the depth boundary
+        const childCountResult = await db
+          .select({
+            parentUri: replies.parentUri,
+            childCount: sql<number>`count(*)`.as('child_count'),
+          })
+          .from(replies)
+          .where(
+            and(
+              eq(replies.rootUri, decodedTopicUri),
+              sql`${replies.depth} = ${maxDepth + 1}`,
+              eq(replies.moderationStatus, 'approved')
+            )
+          )
+          .groupBy(replies.parentUri)
+
+        const childCountMap = new Map(childCountResult.map((r) => [r.parentUri, r.childCount]))
+
         // Ozone label annotation: flag content from spam-labeled accounts
         const ozoneMap = new Map<string, string | null>()
         if (app.ozoneService) {
@@ -654,6 +675,7 @@ export function replyRoutes(): FastifyPluginCallback {
             displayName: null,
             avatarUrl: null,
           },
+          childCount: childCountMap.get(r.uri) ?? 0,
           isMuted: mutedSet.has(r.authorDid),
           isMutedWord: contentMatchesMutedWords(r.content, mutedWords),
           ozoneLabel: ozoneMap.get(r.authorDid) ?? null,

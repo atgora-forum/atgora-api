@@ -37,7 +37,10 @@ export async function checkOnboardingComplete(
     .select()
     .from(userOnboardingResponses)
     .where(
-      and(eq(userOnboardingResponses.did, did), eq(userOnboardingResponses.communityDid, communityDid))
+      and(
+        eq(userOnboardingResponses.did, did),
+        eq(userOnboardingResponses.communityDid, communityDid)
+      )
     )
 
   const answeredFieldIds = new Set(responses.map((r) => r.fieldId))
