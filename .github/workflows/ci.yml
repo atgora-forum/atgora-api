@@ -3,6 +3,17 @@ name: CI
 on:
   pull_request:
     branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'tsconfig.json'
+      - 'vitest.config*.ts'
+      - 'drizzle/**'
+      - 'drizzle.config.ts'
+      - '.github/workflows/ci.yml'
+      - '.github/actions/**'
   push:
     branches: [main]
 
@@ -33,14 +44,18 @@ jobs:
       - run: pnpm typecheck
 
   test:
-    name: Unit Tests
+    name: Unit Tests (${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [lint, typecheck]
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup
-      - run: pnpm test
+      - run: pnpm vitest run --shard=${{ matrix.shard }}/3
 
   test-integration:
     name: Integration Tests
