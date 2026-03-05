@@ -872,6 +872,58 @@ describe('topic routes', () => {
       await noAuthApp.close()
     })
 
+    it('includes pinned topics in list response with pinned fields', async () => {
+      setupMaturityMocks(true)
+      const pinnedRow = sampleTopicRow({
+        uri: `at://${TEST_DID}/forum.barazo.topic.post/pinned1`,
+        rkey: 'pinned1',
+        isPinned: true,
+        pinnedScope: 'forum',
+        pinnedAt: new Date('2026-02-14T00:00:00.000Z'),
+      })
+      const normalRow = sampleTopicRow({
+        uri: `at://${TEST_DID}/forum.barazo.topic.post/normal1`,
+        rkey: 'normal1',
+        lastActivityAt: new Date('2026-02-15T00:00:00.000Z'),
+      })
+      selectChain.limit.mockResolvedValueOnce([pinnedRow, normalRow])
+
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/topics',
+      })
+
+      expect(response.statusCode).toBe(200)
+      const body = response.json<{
+        topics: Array<{
+          uri: string
+          isPinned: boolean
+          pinnedScope: string | null
+          pinnedAt: string | null
+        }>
+      }>()
+      expect(body.topics).toHaveLength(2)
+      expect(body.topics[0]?.isPinned).toBe(true)
+      expect(body.topics[0]?.pinnedScope).toBe('forum')
+      expect(body.topics[0]?.pinnedAt).toBe('2026-02-14T00:00:00.000Z')
+      expect(body.topics[1]?.isPinned).toBe(false)
+      expect(body.topics[1]?.pinnedScope).toBeNull()
+    })
+
+    it('calls orderBy for pinned-first sorting', async () => {
+      setupMaturityMocks(true)
+      selectChain.limit.mockResolvedValueOnce([])
+
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/topics',
+      })
+
+      expect(response.statusCode).toBe(200)
+      // The query chain goes .where().orderBy().limit(), so orderBy must have been called
+      expect(selectChain.orderBy).toHaveBeenCalled()
+    })
+
     it('includes author profile in topic response', async () => {
       resetAllDbMocks()
       setupMaturityMocks(true)
