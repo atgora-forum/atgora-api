@@ -213,6 +213,10 @@ export function reactionRoutes(): FastifyPluginCallback {
           throw notFound('Subject not found')
         }
 
+        if (subjectAuthorDid === user.did) {
+          throw forbidden('Cannot react to your own content')
+        }
+
         const now = new Date().toISOString()
 
         // Build AT Protocol record

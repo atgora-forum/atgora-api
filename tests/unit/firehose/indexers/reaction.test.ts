@@ -67,7 +67,7 @@ describe('ReactionIndexer', () => {
         ...baseParams,
         record: {
           subject: {
-            uri: 'at://did:plc:test/forum.barazo.topic.post/topic1',
+            uri: 'at://did:plc:other/forum.barazo.topic.post/topic1',
             cid: 'bafytopic',
           },
           type: 'like',
@@ -77,6 +77,31 @@ describe('ReactionIndexer', () => {
       })
 
       expect(db.transaction).toHaveBeenCalledTimes(1)
+    })
+
+    it('skips self-reactions without indexing', async () => {
+      const db = createMockDb()
+      const logger = createMockLogger()
+      const indexer = new ReactionIndexer(db as never, logger as never)
+
+      await indexer.handleCreate({
+        ...baseParams,
+        record: {
+          subject: {
+            uri: 'at://did:plc:test/forum.barazo.topic.post/topic1',
+            cid: 'bafytopic',
+          },
+          type: 'like',
+          community: 'did:plc:community',
+          createdAt: '2026-01-01T00:00:00.000Z',
+        },
+      })
+
+      expect(db.transaction).not.toHaveBeenCalled()
+      expect(logger.debug).toHaveBeenCalledWith(
+        expect.objectContaining({ did: 'did:plc:test' }),
+        'Skipping self-reaction'
+      )
     })
   })
 

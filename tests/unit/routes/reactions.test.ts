@@ -235,8 +235,8 @@ describe('reaction routes', () => {
     it('creates a reaction on a topic and returns 201', async () => {
       // 1. Community settings query -> reactionSet includes "like"
       selectChain.where.mockResolvedValueOnce([{ reactionSet: ['like', 'heart'] }])
-      // 2. Subject existence check -> topic found
-      selectChain.where.mockResolvedValueOnce([{ uri: TEST_TOPIC_URI }])
+      // 2. Subject existence check -> topic found (authored by OTHER_DID)
+      selectChain.where.mockResolvedValueOnce([{ uri: TEST_TOPIC_URI, authorDid: OTHER_DID }])
       // 3. Insert returning
       insertChain.returning.mockResolvedValueOnce([sampleReactionRow()])
 
@@ -278,8 +278,8 @@ describe('reaction routes', () => {
     it('creates a reaction on a reply and returns 201', async () => {
       // 1. Community settings
       selectChain.where.mockResolvedValueOnce([{ reactionSet: ['like'] }])
-      // 2. Subject existence check -> reply found
-      selectChain.where.mockResolvedValueOnce([{ uri: TEST_REPLY_URI }])
+      // 2. Subject existence check -> reply found (authored by OTHER_DID)
+      selectChain.where.mockResolvedValueOnce([{ uri: TEST_REPLY_URI, authorDid: OTHER_DID }])
       // 3. Insert returning
       const replyReaction = sampleReactionRow({
         subjectUri: TEST_REPLY_URI,
@@ -308,7 +308,7 @@ describe('reaction routes', () => {
       trackRepoFn.mockResolvedValue(undefined)
 
       selectChain.where.mockResolvedValueOnce([{ reactionSet: ['like'] }])
-      selectChain.where.mockResolvedValueOnce([{ uri: TEST_TOPIC_URI }])
+      selectChain.where.mockResolvedValueOnce([{ uri: TEST_TOPIC_URI, authorDid: OTHER_DID }])
       insertChain.returning.mockResolvedValueOnce([sampleReactionRow()])
 
       const response = await app.inject({
@@ -416,8 +416,8 @@ describe('reaction routes', () => {
     it("uses default reaction set ['like'] when no settings exist", async () => {
       // No settings row found
       selectChain.where.mockResolvedValueOnce([])
-      // Subject exists
-      selectChain.where.mockResolvedValueOnce([{ uri: TEST_TOPIC_URI }])
+      // Subject exists (authored by OTHER_DID)
+      selectChain.where.mockResolvedValueOnce([{ uri: TEST_TOPIC_URI, authorDid: OTHER_DID }])
       insertChain.returning.mockResolvedValueOnce([sampleReactionRow()])
 
       const response = await app.inject({
@@ -432,6 +432,51 @@ describe('reaction routes', () => {
       })
 
       expect(response.statusCode).toBe(201)
+    })
+
+    it('returns 403 when reacting to own content (topic)', async () => {
+      // User's own topic URI uses TEST_DID as the author
+      const ownTopicUri = `at://${TEST_DID}/forum.barazo.topic.post/mytopic1`
+
+      selectChain.where.mockResolvedValueOnce([{ reactionSet: ['like'] }])
+      selectChain.where.mockResolvedValueOnce([{ uri: ownTopicUri, authorDid: TEST_DID }])
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/reactions',
+        headers: { authorization: 'Bearer test-token' },
+        payload: {
+          subjectUri: ownTopicUri,
+          subjectCid: TEST_TOPIC_CID,
+          type: 'like',
+        },
+      })
+
+      expect(response.statusCode).toBe(403)
+      const body = response.json<{ message: string }>()
+      expect(body.message).toMatch(/own/i)
+      expect(createRecordFn).not.toHaveBeenCalled()
+    })
+
+    it('returns 403 when reacting to own content (reply)', async () => {
+      const ownReplyUri = `at://${TEST_DID}/forum.barazo.topic.reply/myreply1`
+
+      selectChain.where.mockResolvedValueOnce([{ reactionSet: ['like'] }])
+      selectChain.where.mockResolvedValueOnce([{ uri: ownReplyUri, authorDid: TEST_DID }])
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/reactions',
+        headers: { authorization: 'Bearer test-token' },
+        payload: {
+          subjectUri: ownReplyUri,
+          subjectCid: TEST_REPLY_CID,
+          type: 'like',
+        },
+      })
+
+      expect(response.statusCode).toBe(403)
+      expect(createRecordFn).not.toHaveBeenCalled()
     })
 
     it('returns 404 when subject does not exist', async () => {
@@ -473,7 +518,7 @@ describe('reaction routes', () => {
 
     it('returns 409 when duplicate reaction (unique constraint)', async () => {
       selectChain.where.mockResolvedValueOnce([{ reactionSet: ['like'] }])
-      selectChain.where.mockResolvedValueOnce([{ uri: TEST_TOPIC_URI }])
+      selectChain.where.mockResolvedValueOnce([{ uri: TEST_TOPIC_URI, authorDid: OTHER_DID }])
       // onConflictDoNothing -> returning() returns empty array
       insertChain.returning.mockResolvedValueOnce([])
 
@@ -493,7 +538,7 @@ describe('reaction routes', () => {
 
     it('returns 502 when PDS write fails', async () => {
       selectChain.where.mockResolvedValueOnce([{ reactionSet: ['like'] }])
-      selectChain.where.mockResolvedValueOnce([{ uri: TEST_TOPIC_URI }])
+      selectChain.where.mockResolvedValueOnce([{ uri: TEST_TOPIC_URI, authorDid: OTHER_DID }])
       createRecordFn.mockRejectedValueOnce(new Error('PDS unreachable'))
 
       const response = await app.inject({
