@@ -39,6 +39,14 @@ export class ReactionIndexer {
   async handleCreate(params: CreateParams): Promise<void> {
     const { uri, rkey, did, cid, record, live } = params
     const { subject } = record
+
+    // Skip self-reactions: extract the subject author DID from the AT URI
+    const subjectAuthorDid = subject.uri.split('/')[2]
+    if (subjectAuthorDid === did) {
+      this.logger.debug({ uri, did }, 'Skipping self-reaction')
+      return
+    }
+
     const clientCreatedAt = new Date(record.createdAt)
     const createdAt = live ? clampCreatedAt(clientCreatedAt) : clientCreatedAt
 
