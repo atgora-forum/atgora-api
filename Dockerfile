@@ -53,16 +53,15 @@ RUN pnpm --filter @singi-labs/lexicons build && \
 RUN pnpm --filter barazo-api deploy /app/deploy --prod
 
 # pnpm deploy creates symlinks for workspace packages that point back to
-# /workspace/, which won't exist in the runner stage. Deploy each workspace
-# package separately (resolves their dependencies), then merge into the
-# API's node_modules.
-RUN pnpm --filter @singi-labs/lexicons deploy /tmp/lexicons-deploy --prod \
-    && pnpm --filter @barazo/plugin-signatures deploy /tmp/sigs-deploy --prod
+# /workspace/, which won't exist in the runner stage. Fix each:
+# - lexicons: use pnpm deploy to get package + resolved dependencies
+# - plugin-signatures: only has peerDeps (satisfied by API), copy source directly
+RUN pnpm --filter @singi-labs/lexicons deploy /tmp/lexicons-deploy --prod
 
 RUN rm -rf /app/deploy/node_modules/@singi-labs/lexicons \
-    && rm -rf /app/deploy/node_modules/@barazo/plugin-signatures \
     && cp -r /tmp/lexicons-deploy /app/deploy/node_modules/@singi-labs/lexicons \
-    && cp -r /tmp/sigs-deploy /app/deploy/node_modules/@barazo/plugin-signatures
+    && rm -rf /app/deploy/node_modules/@barazo/plugin-signatures \
+    && cp -r /workspace/barazo-plugins/packages/plugin-signatures /app/deploy/node_modules/@barazo/plugin-signatures
 
 # ---------------------------------------------------------------------------
 # Stage 3: Production runner
