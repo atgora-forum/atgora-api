@@ -2,7 +2,7 @@ import { readdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { sql } from 'drizzle-orm'
-import type { Logger } from 'pino'
+import type { Logger } from '../logger.js'
 
 import { pluginManifestSchema, type PluginManifest } from '../../validation/plugin-manifest.js'
 

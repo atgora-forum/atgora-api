@@ -1,4 +1,4 @@
-import type { Logger } from 'pino'
+import type { Logger } from '../logger.js'
 
 import type { PluginContext, PluginSettings, ScopedCache, ScopedDatabase } from './types.js'
 

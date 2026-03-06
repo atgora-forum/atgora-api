@@ -1,4 +1,4 @@
-import type { Logger } from 'pino'
+import type { Logger } from '../logger.js'
 
 /** Scoped database access for plugins -- queries are restricted to plugin-owned tables. */
 export interface ScopedDatabase {
@@ -8,7 +8,7 @@ export interface ScopedDatabase {
 
 /** Scoped AT Protocol operations (only available if plugin has pds:read or pds:write permission). */
 export interface ScopedAtProto {
-  getRecord(did: string, collection: string, rkey: string): Promise<unknown | null>
+  getRecord(did: string, collection: string, rkey: string): Promise<unknown>
   putRecord(collection: string, rkey: string, record: unknown): Promise<void>
   deleteRecord(collection: string, rkey: string): Promise<void>
 }
@@ -27,7 +27,7 @@ export interface ScopedHttp {
 
 /** Read-only access to plugin settings configured by the community admin. */
 export interface PluginSettings {
-  get<T = unknown>(key: string): T | undefined
+  get(key: string): unknown
   getAll(): Record<string, unknown>
 }
 
