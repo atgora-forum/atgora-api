@@ -67,6 +67,7 @@ function serializePlugin(row: typeof plugins.$inferSelect, settings?: Record<str
     enabled: row.enabled,
     manifestJson: row.manifestJson,
     dependencies: manifest?.dependencies ?? [],
+    settingsSchema: manifest?.settings ?? {},
     settings: settings ?? {},
     installedAt: row.installedAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
