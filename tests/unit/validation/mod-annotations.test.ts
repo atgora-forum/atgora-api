@@ -3,8 +3,7 @@ import {
   createModNoteSchema,
   modNoteQuerySchema,
   createTopicNoticeSchema,
-  dismissTopicNoticeSchema,
-  topicNoticeQuerySchema,
+  // dismissTopicNoticeSchema and topicNoticeQuerySchema tested via route-level integration
   createWarningSchema,
   warningQuerySchema,
   acknowledgeWarningSchema,
